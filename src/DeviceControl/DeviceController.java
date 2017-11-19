@@ -10,7 +10,7 @@
    pause/resume/stopJob() control the state of the current print job
    Only one job can be run at once, isJobRunning() check if one is running
    Call disconnectSerial() prior to ending the program or dispoising of a DeviceController instance
-   
+
    processing.serial.* must also be imported in the main Processing applet to use this class
 
    Some notes and thoughts:
@@ -36,25 +36,36 @@ public class DeviceController extends Thread {
    */
 
    /*
-      Constructor for DeviceController. Takes only the necessary params for instantiation:
-       a reference to the main PApplet, and serial port info
+      First constructor for DeviceController. Used when the printer serial import
+       is known and available. Serial port params are passed to the constructor,
+       and a connection is attempted.
        Throws a RuntimeException if the serial port provided cannot be opened
    */
-   DeviceController(PApplet thisApplet, String port, int baudRate, boolean testMode) throws RuntimeException {
-      //Set test mode
-      this.testMode = testMode;
-     
+   DeviceController(PApplet thisApplet, String port, int baudRate) throws RuntimeException {
       //Create a serial connection to the printer on the specified port / baud rate
       // Serial needs access to the PApplet object of the main program
-      if(!testMode) {
-         System.out.println("Connecting to printer on port " + port);
-           serialCom = new Serial(thisApplet, port, baudRate);
-           System.out.println("Connected to port " + port);
+      if(!connectSerial(thisApplet, port, baudRate)) {
+         //This version of the consturctor will fail if the supplied serial port is unavailable
+         throw new RuntimeException("Failed to create DeviceController with serial" +
+         " port: failed to open port " + port);
       }
-      else {
+   }
+   /*
+      Second constructor. Allows testMode to be set. Does not attempt to
+       start a serial connection
+   */
+   DeviceController(boolean testMode) {
+      //Set test mode
+      this.testMode = testMode;
+      if(testMode) {
          System.out.println("Proceeding in test mode");
       }
-      comConnected = true;
+   }
+   /*
+      Third constructor. Takes no params, testMode is false and no serial connection
+       is attempted.
+   */
+   DeviceController() {
    }
    /*
       Starts a new print job in its own thread using the provided GCode "file".
@@ -72,7 +83,8 @@ public class DeviceController extends Thread {
       }
 
       //Currently, only one job can be running at a time
-      if(!isJobRunning() && comConnected) {
+      // Also, the serial port must be connected, or test mode must be active
+      if(!isJobRunning() && (sdaConnected || testMode)) {
          //Store the GCode file internally, then start the printing thread
          this.GCode = GCodeFile;
          start();
@@ -149,20 +161,52 @@ public class DeviceController extends Thread {
       return true;
    }
    /*
+      Connects to a printer on the specified serial port
+      Returns true if the connection was successful, or false if the connection failed
+   */
+   public boolean connectSerial(PApplet thisApplet, String port, int baudRate) {
+      if(!sdaConnected) {
+         try {
+            System.out.println("Connecting to printer on port " + port);
+
+            serialCom = new Serial(thisApplet, port, baudRate);
+            sdaConnected = true;
+
+            System.out.println("Connected to port " + port);
+
+            return true;
+         }
+         catch(RuntimeException e) {
+           System.out.println("Failed to open serial port, aborting");
+           return false;
+         }
+      }
+      System.out.println("Serial port is already connected...");
+      return false;
+   }
+   /*
       Disconnects the computer from the printer serial port. This should be called
       at program close, or if a disconnect button is implemented
       Returns true if disconnect was sucessful, or false if there was no connection to disconnect
    */
    public boolean disconnectSerial() {
-      if(serialCom != null) {
+      if(serialCom != null && sdaConnected) {
          serialCom.stop();
+         sdaConnected = false;
          return true;
       }
+      System.out.println("Serial port is already disconnected...");
       return false;
    }
    /*
+      Checks if the serial port is connected
+   */
+   public boolean isSerialConnected() {
+      return sdaConnected;
+   }
+   /*
       Enables test mode, for testing UI interaction and threading
-      Print jobs will run without sending any commands to the com port, and
+      Print jobs will run without sending any commands to the serial port, and
       will not wait for responses
    */
    public boolean setTestMode(boolean testMode) {
@@ -202,7 +246,7 @@ public class DeviceController extends Thread {
    /*
       Runs any custom start code code via using the printJob procedure
    */
-   private boolean runWarmUp() {
+   private boolean runStartCode() {
       if(startCode != null) {
          startPrintJob(startCode);
       }
@@ -211,7 +255,7 @@ public class DeviceController extends Thread {
    /*
       Runs any custom end code via using the printJob procedure
    */
-   private boolean runCoolDown() {
+   private boolean runStopCode() {
       if(endCode != null) {
          startPrintJob(endCode);
       }
@@ -227,7 +271,7 @@ public class DeviceController extends Thread {
          jobRunning = true;
       }
 
-      runWarmUp();
+      runStartCode();
 
       for(int i = 0; i < GCode.size(); i++) {
          if(pauseRequested()) {
@@ -258,7 +302,7 @@ public class DeviceController extends Thread {
          }
       }
 
-      runCoolDown();
+      runStopCode();
 
       return true;
    }
@@ -272,6 +316,7 @@ public class DeviceController extends Thread {
    private boolean sendGCodeLine(String line) {
       //Test mode codepath, skips sending commands to the printer
       synchronized(this) {
+         //This try-catch block is just to keep java happy when using sleep
          if(testMode) {
             try {
                sleep(50);
@@ -320,7 +365,7 @@ public class DeviceController extends Thread {
    private ArrayList<String>  startCode;
    private ArrayList<String>  endCode;
    private boolean            testMode      = false;
-   private boolean            comConnected  = false;
+   private boolean            sdaConnected  = false;
    private boolean            pauseRequest  = false;
    private boolean            stopRequest   = false;
    private boolean            jobRunning    = false;

@@ -13,19 +13,36 @@ ArrayList<String> gcode;
    The setop and loop methods provide example usage for the DeviceController class
 */
 void setup() {
-   //First, instantiate the class providing the PApplet (usually this),
-   // a serial port name, and the baud rate.
-   // The last parameter controls test mode (true = don't send commands to printer)
-   //The constructor throws a RuntimeExcetpion if the serial port cannot be opened,
-   // so use it in a try-catch block
-   try {
-     devControl = new DeviceController(this, "/dev/ttyUSB0", 115200, true);
+   /*
+      First, instantiate DeviceController. Three constructors are provided
+      1) For immidiate connection to a serial port:
+         provide the PApplet (usually this), a serial port name, and the baud rate.
+         The constructor throws a RuntimeExcetpion if the serial port cannot be opened,
+         so use it in a try-catch block
+   */
+
+   /*try {
+     devControl = new DeviceController(this, "/dev/ttyUSB0", 115200);
    }
    catch(RuntimeException e) {
      e.printStackTrace();
      println("Failed to open serial port, aborting");
      return;
-   }
+   }*/
+
+   /*
+      2) For using test mode. A single boolean is provided.
+         true == testMode enabled. No serial connection is made
+   */
+   devControl = new DeviceController(true);
+
+   /*
+      3) For creating a DeviceController when the serial port is unavailable
+         Takes no parameters, a connection can be made later using the
+         connectSerial() method
+   */
+
+   //devControl = new DeviceController();
 
    //Get GCode data from somewhere, this example loads it from a file
    //DeviceController expects an array list of seperate strings
