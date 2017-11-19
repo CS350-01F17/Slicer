@@ -4,8 +4,9 @@
    John Caley, Melissa Chillington, David Hanely, Steven Rollo
 
    Usage:
-   DeviceController should be instanciated when the printer connect button is pressed
-   A serial port name and baud rate must be supplied
+   DeviceController can be created any time prior to or when the printer connection is started
+   A serial port name and baud rate must be supplied in either the constructor, or the
+   connectSerial() method in order to connect to a printer
    Printing jobs can be started with startPrintJob() - see the method for more info
    pause/resume/stopJob() control the state of the current print job
    Only one job can be run at once, isJobRunning() check if one is running
