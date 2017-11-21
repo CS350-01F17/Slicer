@@ -30,6 +30,7 @@ import processing.serial.*;
 import java.lang.Thread;
 import java.util.ArrayList;
 
+
 public class DeviceController extends Thread {
 
    /*
@@ -43,13 +44,21 @@ public class DeviceController extends Thread {
        Throws a RuntimeException if the serial port provided cannot be opened
    */
    DeviceController(PApplet thisApplet, String port, int baudRate) throws RuntimeException {
+     this.thisApplet = thisApplet;
+     this.port = port;
+     this.baudRate = baudRate;
       //Create a serial connection to the printer on the specified port / baud rate
       // Serial needs access to the PApplet object of the main program
+      /*
       if(!connectSerial(thisApplet, port, baudRate)) {
          //This version of the consturctor will fail if the supplied serial port is unavailable
          throw new RuntimeException("Failed to create DeviceController with serial" +
          " port: failed to open port " + port);
       }
+      */
+      //delay for printer
+      //long t = System.currentTimeMillis();
+      //while (System.currentTimeMillis() - t != 2000){}
    }
    /*
       Second constructor. Allows testMode to be set. Does not attempt to
@@ -85,13 +94,14 @@ public class DeviceController extends Thread {
 
       //Currently, only one job can be running at a time
       // Also, the serial port must be connected, or test mode must be active
-      if(!isJobRunning() && (sdaConnected || testMode)) {
+      //if(!isJobRunning() && (sdaConnected || testMode)) {
          //Store the GCode file internally, then start the printing thread
          this.GCode = GCodeFile;
+         //run();
          start();
          return true;
-      }
-      return false;
+      //}
+      //return false;
    }
    /*
       Stops any currently running job
@@ -221,6 +231,24 @@ public class DeviceController extends Thread {
        this shouldn't be called directly by anyone
    */
    public void run() {
+     if(!connectSerial(thisApplet, port, baudRate)) {
+         //This version of the consturctor will fail if the supplied serial port is unavailable
+         throw new RuntimeException("Failed to create DeviceController with serial" +
+         " port: failed to open port " + port);
+      }
+      /*
+      serialCom.write("");
+      String response = "";
+      do{
+        response = serialCom.readString();
+        if(response != null) {
+           while(!response.contains("\r")) {
+              String temp = serialCom.readString();
+              response += ((temp == null) ? "" : temp);
+           }
+        } 
+      }while (response != null && response != "start");
+      */
       runPrintJob();
    }
 
@@ -294,7 +322,7 @@ public class DeviceController extends Thread {
          }
 
          if(!GCode.get(i).startsWith(";")) {
-            boolean status = sendGCodeLine(GCode.get(i).split(";")[0]);
+            boolean status = sendGCodeLine(GCode.get(i).split(" ;")[0]);
             while(!status) {
                System.out.println("Line " + i + " failed, retrying");
                status = sendGCodeLine(GCode.get(i));
@@ -329,15 +357,16 @@ public class DeviceController extends Thread {
          }
       }
 
-      String response;
+      String response = "";
       long startTime = System.currentTimeMillis();
       serialCom.write(line + "\n");
 
       while(true) {
          response = serialCom.readString();
          if(response != null) {
-            while(!response.endsWith("\n")) {
-               response += serialCom.readString();
+            while(!response.contains("\r")) {
+               String temp = serialCom.readString();
+               response += ((temp == null) ? "" : temp);
             }
             System.out.println(response);
             if(response.contains("ok")) {
@@ -365,10 +394,13 @@ public class DeviceController extends Thread {
    private ArrayList<String>  GCode;
    private ArrayList<String>  startCode;
    private ArrayList<String>  endCode;
+   private PApplet            thisApplet;
+   private String             port;
+   private int                baudRate;
    private boolean            testMode      = false;
    private boolean            sdaConnected  = false;
    private boolean            pauseRequest  = false;
    private boolean            stopRequest   = false;
    private boolean            jobRunning    = false;
-   private final int          timeout       = 60000;
+   private final int          timeout       = 10000;
 };
