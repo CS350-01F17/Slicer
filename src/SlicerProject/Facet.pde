@@ -9,16 +9,20 @@ Facet.pde
  together to represent a 3D model.
  
  Authors:
- Slicing Team
- Chris Iossa (https://www.github.com/ChrisIossa)
- Paul Canada
+ Slicing Team: Chris Iossa (https://www.github.com/ChrisIossa), Paul Canada
  */
 
 class Facet {
 
   private PVector vertex1, vertex2, vertex3, facetNormal;
 
-  //constructor that initalizes the vertices
+  /**
+   * Constructor that initializes verticies without a normal.
+   *
+   * @param  vertex1  The first vertex of the facet.
+   * @param  vertex2  The second vertex of the facet.
+   * @param  vertex3  The third vertex of the facet.
+   */
   public Facet(PVector vertex1, PVector vertex2, PVector vertex3)
   {
     this.vertex1 = vertex1;
@@ -26,8 +30,16 @@ class Facet {
     this.vertex3 = vertex3;
     facetNormal = null;
   }
-  
-  //constructor that initalizes the vertices and facet normal
+
+
+  /**
+   * Constructor that initializes verticies with a normal.
+   *
+   * @param  vertex1  The first vertex of the facet.
+   * @param  vertex2  The second vertex of the facet.
+   * @param  vertex3  The third vertex of the facet.
+   * @param  normal   The normal value of the facet.
+   */
   public Facet(PVector vertex1, PVector vertex2, PVector vertex3, PVector facetNormal)
   {
     this.vertex1 = vertex1;
@@ -36,6 +48,10 @@ class Facet {
     this.facetNormal = facetNormal;
   }
 
+
+  /**
+   * Default constructor for Facet object without any initialization.
+   */
   public Facet()
   {
     vertex1 = null;
@@ -44,9 +60,13 @@ class Facet {
     facetNormal=null;
   }
 
-  /*
-    This method will handle setting the verticies of the facet.
-   @param    verticiesInput
+
+  /**
+   * This method will handle setting a single vertex of the facet.
+   *
+   * @param  vertexIndex  Which vertex to modify in this object.
+   * @param  vertexInput  The vertex value to insert to this object's vertex.
+   * @return The status of the completed operation.
    */
   public boolean setVertex(int vertexIndex, PVector vertexInput)
   {
@@ -56,6 +76,7 @@ class Facet {
       return false;
     }
 
+    // Attempt to assign this object's vertex value to the input value.
     try {
       switch(vertexIndex)
       {
@@ -78,6 +99,7 @@ class Facet {
 
       return true;
     }
+    // Return false if the input vertex is null.
     catch (NullPointerException e)
     {
       println("Input vertex cannot be null.");
@@ -85,27 +107,42 @@ class Facet {
       return false;
     }
   }
-  
-  //function to set facet normal to value specefied @param facetNormal
-  
+
+
+  /**
+   * This method will handle setting the normal PVector of the facet.
+   *
+   * @param  facetNormal  The PValue to set the normal to.
+   * @return The status of the completed operation.
+   */
   public boolean setFacetNormal(PVector facetNormal)
   {
+    // Attempt to set the facetNormal of this object to the input facetNormal
     try 
     {
       this.facetNormal = facetNormal;
       return true;
     }
+    // Return false if the given normal is null.
     catch (NullPointerException e)
     {
       println("Cannot set a null PVector to a facetNormal.");
-
       return false;
     }
   }
-  
-  //function takes 3 PVectors, and sets them to the facet's corresponding PVector variables
+
+
+  /**
+   * This method will set this object's 3 verticies to the input verticies.
+   *
+   * @param  vertex1  The first vertex of the facet.
+   * @param  vertex2  The second vertex of the facet.
+   * @param  vertex3  The third vertex of the facet.
+   * @return The status of the completed operation.
+   */
   public boolean setVertices(PVector vertex1, PVector vertex2, PVector vertex3)
   {
+    // Attempt to set the verticies of this object to the input vertices.
     try 
     {
       this.vertex1 = vertex1;
@@ -114,6 +151,7 @@ class Facet {
 
       return true;
     }
+    // Return false if an input vertex is null.
     catch (NullPointerException e)
     {
       println("Cannot set a null vertex to facet.");
@@ -122,14 +160,23 @@ class Facet {
     }
   }
 
-  //getter for facetNormal
-  
+
+  /**
+   * This method will return the facetNormal value of this object.
+   *
+   * @return  This object's normal value.
+   */
   public PVector getFacetNormal()
   {
     return facetNormal;
   }
-  
-  //getter for vertexes
+
+
+  /**
+   * This method will return the values of the 3 vertices in this object.
+   *
+   * @return  A new PVector containing the 3 vertices of this object.
+   */
   public PVector[]  getVerticies()
   {
     return new PVector[] { vertex1, vertex2, vertex3 };
