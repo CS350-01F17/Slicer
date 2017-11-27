@@ -296,15 +296,7 @@ Checks if a pauseRequest has been issued. For use by runPrintJob only.
         if(!line.startsWith("N")) {
           line = "N" + lineNumber + " " + line;
         }
-        while (true) {
-          int code = sendGCodeLine(line, lineNumber);
-          if(code == -1) {
-            break;
-          }
-          else if(code >= 0) {
-
-          }
-        }
+        while (!sendGCodeLine(line, lineNumber));
         lineNumber++;
       }
       else {
