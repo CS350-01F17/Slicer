@@ -1,18 +1,18 @@
 /*
 STLParser.pde
-
-This Sketchbook tab holds the definition and implementation of the STLParser class.
-
-The STLParser class is responsible for reading in an STL file and interpreting the facets
+ 
+ This Sketchbook tab holds the definition and implementation of the STLParser class.
+ 
+ The STLParser class is responsible for reading in an STL file and interpreting the facets
  located within the file. The STLParser class automatically determines whether a given STL
  file is a Binary STL or an ASCII STL.
  
-Due to the use of ArrayList to hold Facets, it is not possible to handle STLs that contain
+ Due to the use of ArrayList to hold Facets, it is not possible to handle STLs that contain
  more than 2^31 - 1 facets. Parsing STL files that contain tens or hundreds of millions of
  facets may require increasing the memory allowed to the sketch in the Preferences window.
  
-Authors: Slicing Team (Andrew Figueroa)
-*/
+ Authors: Slicing Team (Andrew Figueroa)
+ */
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -21,7 +21,7 @@ import java.nio.BufferUnderflowException;
 public class STLParser
 {
   private final String filePath;
-  
+
   /**
    * Constructs an STLParser object given a file path to a .stl file. The path and file
    * pointed to by the path are not checked for validity until STLParser.parseSTL() is called.
@@ -36,13 +36,12 @@ public class STLParser
     if (path == null)
     {
       filePath = "";
-    }
-    else
+    } else
     {
       filePath = path;
     }
   }
-  
+
   /**
    * Parses the .stl file at the location given during the construction of the object. Does
    * not throw any exceptions or return error codes. If an error occurs during parsing, null
@@ -58,25 +57,40 @@ public class STLParser
   public ArrayList<Facet> parseSTL()
   {
     ArrayList<Facet> facets = null;
-    
-    //read in file from disk, contents is set to null if an error occured
+
+    // Read in file from disk; contents is set to null if an error occured.
     byte[] contents = loadBytes(filePath);
-    
-    //convert any ASCII STL to Binary STL
-    if (contents != null && contents.length >= 5)
+
+    // Convert any ASCII STL to Binary STL.
+    if (contents != null && contents.length >= 84)
     {
-      //detects an ASCII STL by checking if the first 5 bytes match "solid"
-      if (contents[0] == 's' && contents[1] == 'o' && contents[2] == 'l' && contents[3] == 'i'
-          && contents[4] == 'd')
+
+      // Attempt to detect an ASCII STL by checking if the first 5 bytes match "solid".
+      if ((contents[0] == 's' && contents[1] == 'o' && contents[2] == 'l' && contents[3] == 'i' && contents[4] == 'd'))
       {
-        STLConverter converter = new STLConverter(filePath);
-        contents = converter.convertASCII();
+
+        // Create a byte[] based on the number of triangles in contents[].
+        // Used to calculate projected size if the file is binary.
+        byte[] numberOfTriangles = { contents[80], contents[81], contents[82], contents[83] };
+
+        // Wrap numberOfTriangles[] into the buffer for use.
+        ByteBuffer buffer = ByteBuffer.wrap(numberOfTriangles);
+        buffer.order(ByteOrder.LITTLE_ENDIAN);
+
+        // If the STL starts with 'solid', but the size of the file is equal to (84 + (50 * numberOfTriangles)), it is actually binary.
+        if (contents.length == (84 + (50 * buffer.getInt())))
+        {
+          println("Binary STL with 'solid' as the first 5 bytes.");
+        } else {
+          STLConverter converter = new STLConverter(filePath);
+          contents = converter.convertASCII();
+        }
       }
     }
-    
-    //interpret facets
+
+    // Interpret facets.
     facets = interpretBinarySTL(contents);
-    
+
     return facets;
   }
 
@@ -91,43 +105,43 @@ public class STLParser
   private ArrayList<Facet> interpretBinarySTL(byte[] stlContents)
   {
     ArrayList<Facet> facets = null;
-    final int STL_HEADER_SIZE = 80; //num of bytes in Binary STL header
-    
+    final int STL_HEADER_SIZE = 80; // Num of bytes in Binary STL header.
+
     if (stlContents != null && stlContents.length > STL_HEADER_SIZE)
     {
       long facetCount = 0;
-      
-      //set up ByteBuffer to process data, starting after the Binary STL header
-      ByteBuffer buffer = ByteBuffer.wrap(stlContents, STL_HEADER_SIZE,
-                                          stlContents.length - STL_HEADER_SIZE);
-      buffer.order(ByteOrder.LITTLE_ENDIAN); //STL files are little endian by convention
-      
-      //process data within stlContents through ByteBuffer
+
+      // Set up ByteBuffer to process data, starting after the Binary STL header.
+      ByteBuffer buffer = ByteBuffer.wrap(stlContents, STL_HEADER_SIZE, 
+        stlContents.length - STL_HEADER_SIZE);
+      buffer.order(ByteOrder.LITTLE_ENDIAN); // STL files are little endian by convention.
+
+      // Process data within stlContents through ByteBuffer.
       try {
-        //STL files store facet count as UINT32, Java/Processing does not have unsigned types
+        // STL files store facet count as UINT32, Java/Processing does not have unsigned types.
         facetCount = Integer.toUnsignedLong(buffer.getInt());
-        println("STLParser.interpretBinarySTL(): STL Facet count: " + facetCount); //TODO: remove after development
-        
-        if (facetCount < Integer.MAX_VALUE) //we cannot handle more than 2^31-1 facets due to ArrayList
+        println("STLParser.interpretBinarySTL(): STL Facet count: " + facetCount); // TODO: remove after development
+
+        if (facetCount < Integer.MAX_VALUE) // We cannot handle more than 2^31-1 facets due to ArrayList
         {
           facets = new ArrayList<Facet>();
           facets.ensureCapacity((int)facetCount);
-          
-          while (true) //until exception occurs (BufferUnderflowException expected at end)
+
+          while (true) // Until exception occurs (BufferUnderflowException expected at end).
           {
+            //TODO: implement the storage of the normal value (requires modifying the Facet class)
             PVector normal = new PVector(buffer.getFloat(), buffer.getFloat(), buffer.getFloat());
             PVector v1 = new PVector(buffer.getFloat(), buffer.getFloat(), buffer.getFloat());
             PVector v2 = new PVector(buffer.getFloat(), buffer.getFloat(), buffer.getFloat());
             PVector v3 = new PVector(buffer.getFloat(), buffer.getFloat(), buffer.getFloat());
             buffer.getShort(); //skip STL "attribute byte count" property
-            
-            facets.add(new Facet(v1, v2, v3, normal));
+
+            facets.add(new Facet(v1, v2, v3));
           }
-        }
-        else
+        } else
         {
           System.out.println("STLParser.interpretBinarySTL(): Could not parse STL as it contained" +
-                             " over Integer.MAX_VALUE (2^31 - 1) facets");
+            " over Integer.MAX_VALUE (2^31 - 1) facets");
         }
       }
       catch (BufferUnderflowException ex)
@@ -135,19 +149,17 @@ public class STLParser
         if (facets == null)
         {
           System.out.println("STLParser.interpretBinarySTL(): Could not read facet count property" + 
-                             " of stlContents. This may not be a valid STL file");
-        }
-        else if (facetCount != facets.size())
+            " of stlContents. This may not be a valid STL file");
+        } else if (facetCount != facets.size())
         {
           System.out.println("STLParser.interpretBinarySTL(): Facet count property did not match" + 
-                             " number of interpreted facets. This may not be a valid STL file");
+            " number of interpreted facets. This may not be a valid STL file");
         }
       }
-    }
-    else
+    } else
     {
       System.out.println("STLParser.interpretBinarySTL(): stlContents was not a valid STL file" + 
-                         " (null or length < 80 bytes).");
+        " (null or length < 80 bytes).");
     }
     return facets;
   }

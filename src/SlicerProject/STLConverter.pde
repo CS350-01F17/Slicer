@@ -20,6 +20,7 @@ STLConverter.pde
 
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
+import java.util.Locale;
 import java.io.FileNotFoundException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Files;
@@ -47,6 +48,8 @@ public class STLConverter
 
   /**
    * Constructor for STLConverter class given an initial path to the file.
+   *
+   * @param    path  The path of the file.
    */
   public STLConverter(String path)
   {
@@ -55,6 +58,11 @@ public class STLConverter
 
   /**
    * Constructor for STLConverter class given an initial path to the file and the instruction to automate the process or not.
+   *
+   * @param    path  The path of the file.
+   * @param    automate  Whether to automatically call convertASCII().
+   *
+   * @see      STLConverter.convertASCII()
    */
   public STLConverter(String path, boolean automate)
   {
@@ -78,16 +86,17 @@ public class STLConverter
    * By convention, the attribute byte count is always 0.
    
    * @return    The byte array containing the binary STL data.
-   * @see        STLConverer.readInLines()
+   * @see        STLConverter.readInLines()
    */
   public byte[] convertASCII()
   {
+    println("Starting ASCII conversion...");
     short attribute = 0;
     int attributeCount = 0;
     int facetCount = 0;
 
+
     // Read in all floats from ASCII STL file.
-    println("Reading file...");
     if (readInLines()) {
       // Return null if the Arraylist<String> is empty, as there is an error.
       if (stringsToConvert.isEmpty())
@@ -98,12 +107,10 @@ public class STLConverter
       facetCount = stringsToConvert.size() / 12;
 
       // Create the ByteBuffer to store all bytes before assigning to byte[]
-      println("Allocating space in the ByteBuffer...");
       ByteBuffer buffer = ByteBuffer.allocate(byteCount);
       buffer.order(ByteOrder.LITTLE_ENDIAN);
 
       // Fill in 80 bytes for the header. At the moment, just fills in with 40 chars, as a char in this sense is 2 bytes.
-      println("Filling in the header...");
       for (int i = 0; i < 80; i++)
       {
         try 
@@ -139,7 +146,6 @@ public class STLConverter
        * Byte Buffer. For every 12 floats, include a 2-byte attribute
        * count.
        */
-      println("Converting floats to bytes...");
       for (String line : stringsToConvert)
       {
 
@@ -164,7 +170,6 @@ public class STLConverter
 
       // Add all the bytes from the ByteArrayOutputStream to our byte array, which will
       // be sent to the STLParser. 
-      println("Moving bytes from ByteBuffer to byte[]...");
       byte convertedBytes[] = buffer.array();
 
 
@@ -175,10 +180,9 @@ public class STLConverter
       if (outputToFile)
       {
         try {
-          
+
           String outputDirectory = System.getProperty("user.dir") + "\\binary_" + path;
-          println("Writing converted binary file to " + outputDirectory + "...");
-          
+
           // Output directory
           Files.write(Paths.get(outputDirectory), convertedBytes);
         }
@@ -195,11 +199,9 @@ public class STLConverter
 
       // Assign contents of Byte Buffer to STLConverter's binarySTL byte[]
       binarySTL = convertedBytes;
-      println("Conversion from ASCII to Binary is complete.");
       return convertedBytes;
     } else 
     {
-
       println("Error reading in STL file.");
       return null;
     }
@@ -208,6 +210,7 @@ public class STLConverter
 
   /**
    * This method sets the path of the STLConverter object.
+   *
    * @param    path The path to the STL file.
    */
   public void setPath(String path)
@@ -219,6 +222,7 @@ public class STLConverter
 
   /*
    * This method checks if the binarySTL attribute is null or not.
+   *
    * @return    True if the binarySTL lbyte array is empty, false otherwise.
    */
   public boolean checkIfNullBinary()
@@ -235,7 +239,7 @@ public class STLConverter
    * float that is in scientific or normal form.
    * e.g. -2.143e-001 ; 7.1394 ; 0.0
    *
-   * @return    True denoting if the operation finished successfully, false otherwise.
+   * @return    True  denoting if the operation finished successfully, false otherwise.
    */
   public boolean readInLines()
   {
@@ -249,6 +253,8 @@ public class STLConverter
     final int headerBytes = 80;
     int attributeCounter = 0;
 
+    int startIndex = 0;
+
     Pattern p = Pattern.compile("-?[0-9]+\\.[0-9]+[Ee]?[-+]?[0-9]*|-?[0-9]+"); // Matches normal floats, scientific notation floats, or single integers.
     Matcher m;
 
@@ -261,13 +267,21 @@ public class STLConverter
     // Reserve 80 bytes for the header, and 4 bytes for the number of facets
     byteCount = headerBytes + floatBytes;
 
-    println("Converting strings to floats...");
+
+    // Calculate the starting index of file to start grabbing strings.
+    startIndex = findStartIndex(lines);
+
+    if (startIndex == -1)  
+    {
+      println("STLConverter.readInLines(): Not a valid ASCII STL - file did not contain the pattern \"facet normal\"");
+      return false;
+    }
 
     // Loop through each line and apply the regex matching
-    for (int i = 0; i < lines.length; i++)
+    for (int i = startIndex; i < lines.length; i++)
     {
       m = p.matcher(lines[i]);
-
+      
       // Add matched content (matcher group()) to the private ArrayList<String>
       while (m.find())
       {
@@ -296,5 +310,34 @@ public class STLConverter
       stringsToConvert = newLines;
       return true;
     }
+  }
+
+  /**
+   * This method will read in the first few lines of the list of strings
+   * looking for the pattern "facet normal".
+   * This will ensure the converter  only converts numbers from actual 
+   * facets, and not from any comments such as a date or version number, etc.
+   *
+   * @return    The index of the first occurrence of the string "facet normal"
+   * @see       STLConverter.readInLines()
+   */
+  public int findStartIndex(String[] list)
+  {
+    // String to match.
+    String startingString = "facet normal";
+
+    // Loop through the first 5 indicies looking for the pattern.
+    for (int i = 0; i < 5; i++)
+    {
+      // If the current line contains the pattern, return the index of the list.
+      if (list[i].toLowerCase(Locale.ENGLISH).contains(startingString.toLowerCase(Locale.ENGLISH)))
+      {
+        return i;
+      }
+    }
+
+    // Error must have occurred here.
+    println("Could not find correct starting index. Not a valid ASCII STL File.");
+    return -1;
   }
 }

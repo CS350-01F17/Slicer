@@ -21,6 +21,11 @@ public class Model
   private PVector rotation;
   private PVector translation;
   
+  /**
+   * Constructor for a Model object given an ArrayList<Facet>.
+   *
+   * @param  facets  The ArrayList<Facet> to pass into this object.
+   */
   public Model(ArrayList<Facet> facets)
   {
     this.facets = facets;
@@ -30,53 +35,104 @@ public class Model
     translation = new PVector(0, 0, 0);
   }
   
+  /**
+   * This method will return the ArrayList<Facet> of this object.
+   *
+   * @return  The ArrayList<Facet> of this object.
+   */
   public ArrayList<Facet> getFacets()
   {
     return facets;
   }
   
+  /**
+   * This method will set this object's facet list with the input ArrayList<Facet>.
+   *
+   * @param  newFacets  The ArrayList<Facet> to pass to this object.
+   */
   public void setFacets(ArrayList<Facet> newFacets) {
     facets = newFacets;
   }
   
+  /**
+   * this method will return the scaling values for this model.
+   *
+   * @return  The scaling PVector (x, y, z) values for this model.
+   */
   public PVector getScale()
   {
     return scaling; 
   }
   
+  /**
+   * This method will set the scaling of this model to the input.
+   *
+   * @param  amount  The PVector (x, y, z) values to set the scaling.
+   */
   public void setScaling(PVector amount)
   {
-    //TODO
     isModified = checkModifications();
   }
   
+  /**
+   * This method will return the rotation values for this model.
+   *
+   * @return  The rotation PVector(x, y, z) values for this model.
+   */
   public PVector getRoatation()
   {
     return rotation; 
   }
   
+  /** 
+   * This method will set the rotation of this model to the input.
+   *
+   * @param  amount  The PVector (x, y, z) values to set the rotation.
+   */
   public void setRoation(PVector amount)
   {
-    //TODO
     isModified = checkModifications();
   }
   
+  /** 
+   * This method will return the translation values for this model.
+   *
+   * @return  The translation PVector (x, y, z) values for this model.
+   */
   public PVector getTranslation()
   {
     return translation;
   }
   
+  /**
+   * This method will set the translation of this model to the input.
+   *
+   * @param  amount  The PVector (x, y, z) values to set the translation.
+   */
   public void setTranslation(PVector amount)
   {
     translation = amount;
     isModified = checkModifications();
   }
   
+  /**
+   * This method will determine if one PVector is equal to another based on their 3 values.
+   *
+   * @param  a  The first PVector.
+   * @param  b  The second PVector.
+   * @return    Return whether the PVectors are equal based on their (x, y, z) values.
+   */
   private boolean pVectorEquals(PVector a, PVector b)
   {
     return a.x == b.x && a.y == b.y && a.z == b.z;
   }
   
+  /**
+   * This method will determine if the scaling, rotation, or translation
+   * of the model was changed.
+   *
+   * @return  Whether the scaling, rotation, or translation of the model was changed.
+   */
   private boolean checkModifications()
   {
     PVector origin = new PVector(0, 0, 0);
