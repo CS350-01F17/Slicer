@@ -138,7 +138,7 @@ public class DeviceController extends Thread {
       pauseRequest = false;
     }
 
-    if (!isJobRunning() || (sdaConnected && testMode)) {
+    if (!isJobRunning() && (sdaConnected || testMode)) {
       //Store the GCode file internally, then start the printing thread
       this.GCode = GCodeFile;
       jobRequest = true;
@@ -245,7 +245,7 @@ public class DeviceController extends Thread {
           return true;
         } else if (response.contains("T:")) {
           startTime = System.currentTimeMillis();
-        } else {
+        } else if(response.contains("Resend") || response.contains("ok")) {
           return false;
         }
       }
