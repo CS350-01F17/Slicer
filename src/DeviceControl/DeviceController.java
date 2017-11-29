@@ -167,6 +167,10 @@ public class DeviceController extends Thread {
       }
     }
 
+    int lineNumber = 1;
+    GCode.set(0, GCode.get(0).replace("\ufeff", ""));
+    GCode.set(0, GCode.get(0).replace("\ufffe", ""));
+
     for (int i = 0; i < GCode.size(); i++) {
 
       if (pauseRequested()) {
@@ -189,10 +193,6 @@ public class DeviceController extends Thread {
         }
         return true;
       }
-
-      int lineNumber = 1;
-      GCode.set(0, GCode.get(0).replace("\ufeff", ""));
-      GCode.set(0, GCode.get(0).replace("\ufffe", ""));
 
       if (!GCode.get(i).startsWith(";")) {
         String line = GCode.get(i).split(";")[0];
