@@ -1,8 +1,8 @@
 /*
  Device Controller for a generic 3D printer
-
+ 
  John Caley, Melissa Chillington, David Hanely, Steven Rollo
-
+ 
  Usage:
  DeviceController can be created any time prior to or when the printer connection is started
  A serial port name and baud rate must be supplied in either the constructor, or the
@@ -11,9 +11,9 @@
  pause/resume/stopJob() control the state of the current print job
  Only one job can be run at once, isJobRunning() check if one is running
  Call disconnectSerial() prior to ending the program or dispoising of a DeviceController instance
-
+ 
  processing.serial.* must also be imported in the main Processing applet to use this class
-
+ 
  Some notes and thoughts:
  Having multiple instances of DeviceController is untested, and we are unsure
  how the Processing classes (Serial, PApplet) would react to such a situation
@@ -34,14 +34,14 @@ import java.util.ArrayList;
 public class DeviceController extends Thread {
   /*
     Main constructor
-  */
+   */
   DeviceController(PApplet thisApplet) {
     this.thisApplet = thisApplet;
     sdaConnected = false;
   }
   /*
     Test mode constructor
-  */
+   */
   DeviceController(boolean testMode) {
     //Set test mode
     this.testMode = testMode;
@@ -91,8 +91,10 @@ public class DeviceController extends Thread {
   }
 
   public boolean pauseJob() {
+    System.out.println("Enter Pause Method");
     synchronized(this) {
       pauseRequest = true;
+      System.out.println("Exit Pause Method");
       return true;
     }
   }
@@ -166,6 +168,18 @@ public class DeviceController extends Thread {
         }
       }
     }
+    synchronized(serialCom) {
+      serialCom.write("M110 N0\n");
+    }
+    
+    while (!testMode) {
+      response = serialCom.readStringUntil('\r');
+      if (response != null) {
+        if (response.contains("ok")) {
+          break;
+        }
+      }
+    }
 
     int lineNumber = 1;
     GCode.set(0, GCode.get(0).replace("\ufeff", ""));
@@ -176,7 +190,7 @@ public class DeviceController extends Thread {
       if (pauseRequested()) {
         System.out.println("Printing paused...");
       }
-      while (!stopRequest && pauseRequested()) {
+      while (!stopRequested() && pauseRequested()) {
         try {
           sleep(10);
         }
@@ -185,7 +199,7 @@ public class DeviceController extends Thread {
         }
       }
 
-      if (stopRequest) {
+      if (stopRequested()) {
         System.out.println("Printing stopped");
         stopRequest = false;
         synchronized(this) {
@@ -245,7 +259,7 @@ public class DeviceController extends Thread {
           return true;
         } else if (response.contains("T:")) {
           startTime = System.currentTimeMillis();
-        } else if(response.contains("Resend") || response.contains("ok")) {
+        } else if (response.contains("Resend") || response.contains("ok")) {
           return false;
         }
       }
