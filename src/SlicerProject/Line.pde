@@ -8,9 +8,9 @@ Line.pde
  represented as a 2D line segment made up of two points. Both points are publicly
  accessible.
  
- Authors: Slicing Team (Andrew Figueroa)
- */
 
+Authors: Slicing Team (Andrew Figueroa, Chris Iossa)
+*/
 
 public class Line {
   
@@ -40,19 +40,30 @@ public class Line {
 
 
   /*
-  * This method will return the distance between the current line, and a given point (xIn, yIn).
-   *
-   * @param  xIn  The x coordinate of the target point
-   * @param  yIn  The y coordinate of the target point
-   * @return      The distance between this line and a given point.
-   */
-  public float getDist(float xIn, float yIn)
+  * returns the distance between this line and another Line @param lineIn 
+  * @param  lineIn  the Line to compare the current Line object with
+  */
+  public float getDist(Line lineIn)
   {
-    return (float) Math.sqrt((x2-xIn)*(x2-xIn)+(y2-yIn)*(y2-yIn));
+    float unFlippedDist=(float) Math.sqrt((x2-lineIn.x1)*(x2-lineIn.x1)+(y2-lineIn.y1)*(y2-lineIn.y1));
+    lineIn.swapPoints();
+    
+    float flippedDist=(float) Math.sqrt((x2-lineIn.x1)*(x2-lineIn.x1)+(y2-lineIn.y1)*(y2-lineIn.y1));
+    
+    if(unFlippedDist<flippedDist)
+    {
+      lineIn.swapPoints();
+      return unFlippedDist;
+    }
+    else
+    {
+     return flippedDist; 
+    }
+    
   }
 
   /**
-   * This method will swap the start point and the end point of this line.
+   * This method will swap the x1/y1 and x2/y2 points of the line.
    */
   public void swapPoints()
   {
