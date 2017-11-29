@@ -24,7 +24,7 @@
  lib. We also need Thread so the serial communications can be run in parallel
  with the rest of the program
  */
- 
+
 import processing.core.*;
 import processing.serial.*;
 import java.lang.Thread;
@@ -32,22 +32,87 @@ import java.util.ArrayList;
 
 
 public class DeviceController extends Thread {
-
-
+  /*
+    Main constructor
+  */
   DeviceController(PApplet thisApplet) {
     this.thisApplet = thisApplet;
+    sdaConnected = false;
+  }
+  /*
+    Test mode constructor
+  */
+  DeviceController(boolean testMode) {
+    //Set test mode
+    this.testMode = testMode;
+    if (testMode) {
+      System.out.println("Proceeding in test mode");
+    }
   }
 
-  //starts a thread for serial communication
-  public void connectSerial(String port, int baudRate) {
+  //default constructor
+  DeviceController() {
+  }
+
+  //Starts a thread for serial communication
+  //Returns false if the serial port is already connected
+  public boolean connectSerial(String port, int baudRate) {
+    sdaConnected = true;
     this.port = port;
     this.baudRate = baudRate;
     Thread t = new Thread(this);
     t.start();
   }
 
+  //method used by thread
+  public void run() {
+    if (_connectSerial()) {
+      while (sdaConnected) {
+        if (jobRequest) {
+          runPrintJob();
+          jobRequest = false;
+        } else {
+          try {
+            sleep(10);
+          }
+          catch(InterruptedException e) {
+            e.printStackTrace();
+          }
+        }
+      }
+    }
+  }
+
+  public boolean stopJob() {
+    synchronized(this) {
+      pauseRequest = false;
+      stopRequest = true;
+      return true;
+    }
+  }
+
+  public boolean pauseJob() {
+    synchronized(this) {
+      pauseRequest = true;
+      return true;
+    }
+  }
+
+  public boolean resumeJob() {
+    synchronized(this) {
+      pauseRequest = false;
+      return true;
+    }
+  }
+
+  public boolean isJobRunning() {
+    synchronized(this) {
+      return jobRunning;
+    }
+  }
+
   //Connects to a printer on the specified serial port Returns true if the connection was successful, or false if the connection failed
-  public boolean _connectSerial() {
+  private boolean _connectSerial() {
     if (!sdaConnected) {
       try {
         System.out.println("Connecting to printer on port " + port);
@@ -66,29 +131,6 @@ public class DeviceController extends Thread {
     return false;
   }
 
-  //method used by thread
-  public void run() {
-    if (_connectSerial()) {
-      while (sdaConnected) {
-        if (jobRequest) {
-          runPrintJob();
-          jobRequest = false;
-        } else {
-          try {
-            sleep(10);
-          } 
-          catch(InterruptedException e) {
-            e.printStackTrace();
-          }
-        }
-      }
-    }
-  }
-
-  //default constructor
-  DeviceController() {
-  }
-
   //called to start a print job
   public boolean startPrintJob(ArrayList<String> GCodeFile) {
     //Reset stop/pause requests
@@ -97,7 +139,7 @@ public class DeviceController extends Thread {
       pauseRequest = false;
     }
 
-    if (!isJobRunning()) {
+    if (!isJobRunning() || (sdaConnected) && testMode)) {
       //Store the GCode file internally, then start the printing thread
       this.GCode = GCodeFile;
       jobRequest = true;
@@ -116,19 +158,15 @@ public class DeviceController extends Thread {
     }
 
     String response = "";
-    while (true) {
+    while (!testMode) {
       response = serialCom.readStringUntil('\r');
       if (response != null) {
-        if (response.contains("wait") || response.contains("start")) {
+        if (response.contains("wait")) {
           System.out.println("Starting...");
           break;
         }
       }
     }
-
-    int lineNumber = 1;
-    GCode.set(0, GCode.get(0).replace("\ufeff", ""));
-    GCode.set(0, GCode.get(0).replace("\ufffe", ""));
 
     for (int i = 0; i < GCode.size(); i++) {
 
@@ -150,8 +188,12 @@ public class DeviceController extends Thread {
         synchronized(this) {
           jobRunning = false;
         }
-        return false;
+        return true;
       }
+
+      int lineNumber = 1;
+      GCode.set(0, GCode.get(0).replace("\ufeff", ""));
+      GCode.set(0, GCode.get(0).replace("\ufffe", ""));
 
       if (!GCode.get(i).startsWith(";")) {
         String line = GCode.get(i).split(";")[0];
@@ -159,7 +201,7 @@ public class DeviceController extends Thread {
         if (!line.startsWith("N")) {
           line = "N" + lineNumber + " " + line;
         }
-        System.out.println(line);
+        //System.out.println(line);
         while (!sendGCodeLine(line, lineNumber));
         lineNumber++;
       }
@@ -189,7 +231,15 @@ public class DeviceController extends Thread {
     }
 
     while (true) {
-      response = serialCom.readStringUntil('\r');
+      try {
+        synchronized(serialCom) {
+          response = serialCom.readStringUntil('\r');
+        }
+      }
+      catch (Exception e) {
+        e.printStackTrace();
+      }
+
       if (response != null) {
         System.out.println(response);
         if (response.contains("ok " + lineNumber)) {
@@ -210,40 +260,14 @@ public class DeviceController extends Thread {
   //closes serial port connection
   public boolean disconnectSerial() {
     if (serialCom != null && sdaConnected) {
-      serialCom.stop();
+      synchronized(serialCom) {
+        serialCom.stop();
+      }
       sdaConnected = false;
       return true;
     }
     System.out.println("Serial port is already disconnected...");
     return false;
-  }
-
-  public boolean stopJob() {
-    synchronized(this) {
-      pauseRequest = false;
-      stopRequest = true;
-      return true;
-    }
-  }
-
-  public boolean pauseJob() {
-    synchronized(this) {
-      pauseRequest = true;
-      return true;
-    }
-  }
-
-  public boolean resumeJob() {
-    synchronized(this) {
-      pauseRequest = false;
-      return true;
-    }
-  }
-
-  public boolean isJobRunning() {
-    synchronized(this) {
-      return jobRunning;
-    }
   }
 
   private boolean pauseRequested() {
