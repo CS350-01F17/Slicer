@@ -14,50 +14,54 @@ Authors: Slicing Team (Andrew Figueroa)
 */
 
 public class Model
-  {
-    private ArrayList<Facet>   facets;     
-    private ArrayList<String>  GCode;
-    private ArrayList<Layer>    layers;
+{
+  private ArrayList<Facet> facets;
+  private ArrayList<Layer> layers;
+  private ArrayList<String> GCode;
+  private boolean isModified;
+
+  
+  /**
+   * Constructor for a Model object given an ArrayList<Facet>.
+   *
+   * @param  facets  The ArrayList<Facet> to pass into this object.
+   */
+  
   
     private float layerHeight;
-    private float inFill;
-  
- 
-  
-  
-    private boolean isModified;
+    
+    private PVector center;
                             
   
   
-    public Model(ArrayList<Facet> facets, float LH, float IF)
+    public Model(ArrayList<Facet> facets)
       {
         //set state variables
         isModified = true;      //facets need to be sliced to G-code       
         
         this.facets = facets;  //initilize facets
-        
-        //set slicing setting      
-        this.inFill = IF;             
-        this.layerHeight = LH;
+        calculateCenter();
     }
   
   
-  public void Slice()
+  public void Slice(float LH, float InFill)
     {
-      if( isModified ) 
-        {
-           Slicer alg = new Slicer(facets, layerHeight, inFill);
-           layers = alg.sliceLayers();
-           GCode = alg.createGCode(layers);    
-           synchronize();
-           isModified = false;
-        }
+       layerHeight = LH;
+       Slicer alg = new Slicer(facets, layerHeight, InFill);
+       layers = alg.sliceLayers();
+       GCode = alg.createGCode(layers, 160, 50);    
+       synchronize();
+       isModified = false;
     }  
   
   
-  public void Scale(PVector scale)
+  public void Scale(PVector scale, RenderControler renderer)
     {
-      
+      boolean update = false;
+      if(renderer.isFocusedOnModel(this))
+        {
+          update = true;
+        }
       //This updates the facet vertex coordinates
       //center does not need to be recomputed because mean of all cordnats wont change
       for (Facet facet : facets) {
@@ -79,20 +83,34 @@ public class Model
           }
         facet.setVertices(vertices[0], vertices[1], vertices[2]); 
       } 
-      isModified = true;
+      isModified = true; //<>//
+      calculateCenter();
+      if(update)
+        {
+          renderer.FocusOnModel(this);  
+        }
     }
   
   
     //theta specifies the angle of rotation arond the x axis
     //phi spevifies the angle of rotation around the z axis
-  public void Rotate(float theta, float phi)
+  public void Rotate(float theta, float phi, float iota, RenderControler renderer)
     {
-      if(theta == 0 && phi == 0)
+      if(theta == 0 && phi == 0 && iota == 0)
+      {
+        return;
+      }
+
+      boolean update = false;
+
+      if(renderer.isFocusedOnModel(this))
         {
-          return;
-        }  
+          update = true;
+        }
+
       theta = theta - int(theta / 360)*360;
       phi = phi -  int(phi / 180)*180;
+
       if(theta < 0)  
         {
           theta += 360;
@@ -101,69 +119,102 @@ public class Model
         {
           phi += 180;
         }
-     
-      
-     
-      //rotate each facet around the X, Y, and Z axis 
-      for (Facet facet : facets) 
+
+      //rotate each facet around the X, Y, and Z axis
+      for (Facet facet : facets) // For each facet.
         {
           PVector[] temp = facet.getVerticies();
-          
-          for(int i=0; i<3; i++)
+
+          for(int i=0; i<3; i++) // For each vector
             {
-               //TODO 
+              //Rotation around the x axis.
+              if(theta != 0){
+                float x1 = temp[i].x - center.x;
+                float z1 = temp[i].z - center.z;
+
+                float x2 = z1 * sin(theta) + x1 * cos(theta);
+                float z2 = z1 * cos(theta) - x1 * sin(theta);
+
+                temp[i].x = x2 + center.x;
+                temp[i].z = z2 + center.z;
+              }
+
+              // Rotation around the y axis.
+              if(phi != 0){
+                float y1 = temp[i].y - center.y;
+                float z1 = temp[i].z - center.z;
+
+                float y2 = y1 * cos(phi) - z1 * sin(phi);
+                float z2 = y1 * sin(phi) + z1 * cos(phi);
+
+                temp[i].y = y2 + center.y;
+                temp[i].z = z2 + center.z;
+              }
+
+              // Rotation around the z axis.
+              if(iota != 0){
+                float x1 = temp[i].x - center.x;
+                float y1 = temp[i].y - center.y;
+
+                float x2 = x1 * cos(iota) - y1 * sin(iota);
+                float y2 = x1 * sin(iota) + y1 * cos(iota);
+
+                temp[i].x = x2 + center.x;
+                temp[i].y = y2 + center.y;
+              }
 
             }
             facet.setVertices(temp[0], temp[1], temp[2]);
+
          }
-       isModified = true;
+
+      
        levelModel();
+
+       if(update)
+        {
+          renderer.FocusOnModel(this);
+        } //<>// //<>//
+       
     }
  
-  public void Translate(float X, float Y)
+  public void Translate(float X, float Y, RenderControler renderer)
     {
       if(X == 0 && Y == 0 ){
             return;
         }
+        
+      boolean update = false;
+      if(renderer.isFocusedOnModel(this))
+        {
+          update = true;
+        }
+        
       for (Facet facet : facets) 
         {
            PVector[] temp = facet.getVerticies();
            facet.setVertices(temp[0].add(X,Y,0), temp[1].add(X,Y,0), temp[2].add(X,Y,0));
         }
       isModified = true;
-      levelModel();    
+      calculateCenter();
+      if(update)
+        {
+          renderer.FocusOnModel(this);  
+        }
     }
     
   
-  public void setInfill(float newFill)
-    {
-      inFill = newFill;
-      isModified = true;
-    }
-    
-  
-  public float getInFill()
-    {
-       return inFill;
-    }
-  
-  
-  public void setLayerHeight(float newH)
-    {
-      layerHeight = newH;
-      isModified = true;
-    }
-    
-  
-  public float getGetLayerHeight()
+  public float getLayerHeight()
     {
        return layerHeight;
     }
    
    
-  public void TESTsetLayers(ArrayList<Layer> layers)
+  public void TESTsetLayers(ArrayList<Layer> layers, float LH)
     {
+     layerHeight = LH;
      this.layers = layers; 
+     isModified = false;
     }
     
     
@@ -173,7 +224,7 @@ public class Model
     }
     
     
-  public PVector getCenter()
+  public void calculateCenter()
     {
       float AvgX=0;
         float AvgY=0;
@@ -201,7 +252,12 @@ public class Model
            }
            AvgZ += tempAvg/n;
         }
-      return new PVector(AvgX, AvgY, AvgZ);
+      center =  new PVector(AvgX, AvgY, AvgZ);
+    }
+    
+  private PVector getCenter()
+    {
+      return center;
     }
       
 
@@ -234,30 +290,28 @@ public class Model
   public void levelModel()
     {
       //find lowest point
-      PVector min = facets.get(0).GetLowest();
+      float min = facets.get(0).getLowest();
       for (Facet facet : facets) 
         {
-           if(facet.GetLowest().z < min.z)
+           if(facet.getLowest() < min)
              {
-               min = facet.GetLowest();
+               min = facet.getLowest();
              }
          }
        
        //invert the value of the lowest point 
        //models above the floor are moved down
        //models bellow are moved up
-       min.z = -min.z;
-       min.x=0;
-       min.y=0;
        
        //update all facets 
        for (Facet facet : facets) 
          {
            PVector[] temp = facet.getVerticies();
-           facet.setVertices(temp[0].add(min), temp[1].add(min), temp[2].add(min));
+           facet.setVertices(temp[0].add(0,0,-min), temp[1].add(0,0,-min), temp[2].add(0,0,-min));
          }
          
-         isModified = true;
+       calculateCenter();
+       isModified = true; //<>//
     }
  
  

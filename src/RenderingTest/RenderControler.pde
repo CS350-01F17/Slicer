@@ -18,6 +18,8 @@ public class RenderControler
     
     private Renderer Visualizer;
     
+    private PVector DefaultFocus;
+    
     private boolean RenderFacets;
     
     
@@ -28,6 +30,8 @@ public class RenderControler
         Width = W;
         Length = L;
         Height = H;
+        
+        DefaultFocus = new PVector(Width/2, Length/2, Height/2);
         
         RenderFacets = true;
         Visualizer = new FacetRenderer();
@@ -42,18 +46,33 @@ public class RenderControler
         frame.lights();
         frame.background(255);
         
+        int lim;
+        Renderer temp;
+        temp = Visualizer;
+        
+        int tint = 256;
+        
         if(Subject.isModified() && !RenderFacets)
           {
-            Subject.Slice();
+             tint = 200;
+             Visualizer = new FacetRenderer();
           }
-        frame.fill(255,0,0);
-        frame = Visualizer.Render(frame, Subject);
-        
+        Visualizer.Load(Subject, 255, tint);
+        lim = Visualizer.getSize();
+        for(int i=0; i<lim; i++)
+           {
+             PShape drawing = Visualizer.Render(i);
+             frame.shape(drawing);
+           }
+        Visualizer = temp;
         frame = addBuildSpace(frame);
+        
         frame.endCamera();
-         frame.endDraw();
+        frame.endDraw();
         return frame;
       }
+      
+      
   
     public PGraphics RenderBuildSpace(PGraphics frame)
       {
@@ -107,7 +126,7 @@ public class RenderControler
          frame.endShape();
          
          //floor
-         frame.fill(0);
+         frame.fill(125);
          frame.beginShape();
          frame.vertex(0, 0, 0);
          frame.vertex(0, Length, 0);
@@ -123,18 +142,32 @@ public class RenderControler
       {
         //theta specifies the angle of rotation arond the x axis
         //phi spevifies the angle of rotation around the z axis
-        Camera = new POV(90, 60, (Height+Length+Width)/1.5,  new PVector(Width/2, Length/2, Height/2));
+        Camera = new POV(30, 100, (Height+Length+Width)/1.5,  DefaultFocus);
       }
      
     public void FocusOnModel(Model Subject)
       {
+        DefaultFocus = Subject.getCenter();
         Camera.setFocus(Subject.getCenter());
       }
+      
+    public boolean isFocusedOnModel(Model Subject)
+      {
+        if(PVector.dist(Subject.getCenter(), DefaultFocus) < .01)
+          {
+            return true;
+          }
+        else
+          {
+            return false;
+          }
+      }
+      
       
     public void CenterModelOnBuildPlate(Model Subject)
       {
         PVector center = Subject.getCenter();
-        Subject.Translate(Width/2 - center.x, Length/2 - center.y);
+        Subject.Translate(Width/2 - center.x, Length/2 - center.y, this);
       }
   
     public float[] getDim()
@@ -174,7 +207,7 @@ public class RenderControler
               }
             else
               {
-                //Visualizer = new LayerRendrer();
+                Visualizer = new LayerRenderer();
               }            
           }
       }

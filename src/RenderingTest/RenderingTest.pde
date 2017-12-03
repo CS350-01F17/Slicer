@@ -14,7 +14,6 @@ Authors:
 PGraphics rendering;
 RenderControler vis;
 boolean realsed = true;
-
 int i=0;
 int j=0;
 
@@ -29,14 +28,13 @@ void setup() {
   vis = new RenderControler(100,100,100);
   vis.ResetCamera();
   
-  String adress = "C:\\Users\\200Motels\\Documents\\GitHub\\Slicer_Renderer\\40mmcube.stl";
+  String adress = "../../40mmcube.stl";
   STLParser parser = new STLParser(adress);
   ArrayList<Facet> data = parser.parseSTL();
-  test = new Model(data, .1, .1);
-  
-  vis.Render(test, rendering);
-  image(rendering, 50 ,50);
-  
+  test = new Model(data);  
+  vis.CenterModelOnBuildPlate(test);
+  vis.FocusOnModel(test);
+  test.Slice(.2, .1);
 }
 
 //After the setup function finishes, this function is called repeatedly until the
@@ -44,23 +42,81 @@ void setup() {
 //Depending on how the project proceeds, we may not use this function, and instead
 // treat the setup function as if it were similar to a main function in C/C++/Java.
 void draw() {
-    modelTranslationTest();
+    // One and ONLY one of these function calls should be uncommented
+    
+    
+    //modelTranslationTest(); // Seems to work
+    
+    //modelScalingTest(); // Seems to work
+    
+    //rotationTest(); // Z axis rotation isn't correct
+    
+    //ZoomTest();
+    
+    //testLayerRenderer();
+    //testFacetRenderer();
+    
+   //testSliceAndRender();
+   
+   //modelRotationTest();
+
 }
 
 
+void testSliceAndRender()
+  {
+     vis.SetMode(false);
+     POV temp = vis.getPOV();
+     temp.setZoom(70);
+     vis.SetPOV(temp);
+     vis.Render(test, rendering);
+     
+     
+     image(rendering, 50 ,50);
+  }
+
+
+
+void testLayerRenderer()
+  {
+    ArrayList<Line> testLayerRenderer = new ArrayList<Line>();
+    testLayerRenderer.add(new Line(1, 1, 10, 10, false));
+    testLayerRenderer.add(new Line(10, 10, 20, 15, false));
+    testLayerRenderer.add(new Line(20, 15, 30, 10, false));
+    testLayerRenderer.add(new Line(30, 10, 25, 5, false));
+    testLayerRenderer.add(new Line(25, 5, 20, 10, false));
+    testLayerRenderer.add(new Line(20, 10, 10, 5, false));
+    ArrayList<Layer> temp = new ArrayList<Layer>();
+    temp.add(new Layer(testLayerRenderer, 10));
+    test.TESTsetLayers(temp, .2);
+    vis.SetMode(false);
+    
+    vis.Render(test, rendering);
+    
+    image(rendering, 50 ,50);
+    
+  }
+  
+void testFacetRenderer()
+  {
+    vis.SetMode(true);
+    vis.Render(test, rendering);
+    image(rendering, 50 ,50);
+    
+  }
 
 
 void modelTranslationTest()
   {
     if(mousePressed)
     {
-      test.Translate(1,1);
+      test.Translate(1,1, vis);
       vis.Render(test, rendering);
       image(rendering, 50 ,50);
     }
     else
       {
-      test.Translate(-1,-1);
+      test.Translate(-1,-1, vis);
       vis.Render(test, rendering);
       image(rendering, 50 ,50);
       }
@@ -70,13 +126,13 @@ void modelScalingTest()
   {
     if(mousePressed)
     {
-      test.Scale(new PVector(1.01,1.01, 1.01));
+      test.Scale(new PVector(1.01,1.01, 1.01), vis);
       vis.Render(test, rendering);
       image(rendering, 50 ,50);
     }
     else
       {
-      test.Scale(new PVector(.99, .99, .99));
+      test.Scale(new PVector(.99, .99, .99), vis);
       vis.Render(test, rendering);
       image(rendering, 50 ,50);
       }
@@ -85,8 +141,36 @@ void modelScalingTest()
 
 
 void modelRotationTest()
+{
+  if (mousePressed) {
+    test.Rotate(5.0, 0, 0, vis);
+  } else {
+    test.Rotate(0, 5.0, 0, vis);
+  }
+  
+  vis.Render(test, rendering);
+  image(rendering, 50, 50);
+}
+
+
+void ZoomTest()
   {
-  //TODO
+   if(mousePressed)
+      {
+        POV temp = vis.getPOV();
+        temp.zoom(1);
+        vis.SetPOV(temp);
+        vis.Render(test, rendering);
+        image(rendering, 50 ,50);
+      }
+   else
+      {
+        POV temp = vis.getPOV();
+        temp.zoom(-1);
+        vis.SetPOV(temp);
+        vis.Render(test, rendering);
+        image(rendering, 50 ,50);
+      }
   }
 
 void rotationTest()
