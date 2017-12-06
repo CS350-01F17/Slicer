@@ -113,9 +113,27 @@ public class DeviceController extends Thread {
     }
   }
 
+  public boolean isSerialConnected() {
+    synchronized(this) {
+      return sdaConnected;
+    }
+  }
+
   public boolean isJobRunning() {
     synchronized(this) {
       return jobRunning;
+    }
+  }
+
+  public boolean isStopRequested() {
+    synchronized(this) {
+      return stopRequest;
+    }
+  }
+
+  public boolean isPauseRequested() {
+    synchronized(this) {
+      return pauseRequest;
     }
   }
 
@@ -241,7 +259,7 @@ public class DeviceController extends Thread {
 
       if (response != null) {
         System.out.println(response);
-        if (response.contains("ok " + lineNumber)) {
+        if (response.contains("ok " + lineNumber) || response.contains("skip " + lineNumber)) {
           return true;
         } else if (response.contains("T:")) {
           startTime = System.currentTimeMillis();
