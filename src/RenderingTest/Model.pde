@@ -19,6 +19,10 @@ public class Model
   private ArrayList<Layer> layers;
   private ArrayList<String> GCode;
   private boolean isModified;
+  
+  public int getLayerCount() {
+    return layers.size();
+  }
 
   
   /**
@@ -57,13 +61,9 @@ public class Model
   
   public void Scale(PVector scale, RenderControler renderer)
     {
-      boolean update = false;
-      if(renderer.isFocusedOnModel(this))
-        {
-          update = true;
-        }
       //This updates the facet vertex coordinates
       //center does not need to be recomputed because mean of all cordnats wont change
+      PVector start = center;
       for (Facet facet : facets) {
         PVector vertices[] = facet.getVerticies();
         for(int i=0; i<3; i++)
@@ -82,13 +82,9 @@ public class Model
               }
           }
         facet.setVertices(vertices[0], vertices[1], vertices[2]); 
-      } 
-      isModified = true; //<>//
+      }  //<>//
       calculateCenter();
-      if(update)
-        {
-          renderer.FocusOnModel(this);  
-        }
+      Translate(start.x - center.x, start.y - center.y, renderer);
     }
   
   

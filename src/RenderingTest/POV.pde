@@ -1,3 +1,10 @@
+/*
+POV.pde
+this file containes the implimintation for the POV class used to store information on the position and orintation of 
+
+*/
+
+
 class POV {
   
   private PVector location;

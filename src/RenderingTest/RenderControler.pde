@@ -137,6 +137,16 @@ public class RenderControler
          
          return frame; 
       }
+      
+    public Renderer GetVisualizer()
+    {
+        return Visualizer;
+    }
+    
+    public void SetVisualizer(Renderer r)
+    {
+        Visualizer = r;
+    }
   
     public void ResetCamera()
       {
@@ -169,6 +179,17 @@ public class RenderControler
         PVector center = Subject.getCenter();
         Subject.Translate(Width/2 - center.x, Length/2 - center.y, this);
       }
+      
+      
+    public Renderer getRenderer()
+      {
+        return Visualizer;
+      }
+      
+    public void setRenderer(Renderer Render)
+      {
+        Visualizer = Render;
+      }
   
     public float[] getDim()
       {
@@ -185,7 +206,7 @@ public class RenderControler
         Length = l;
         Height = h;
       }
-      
+    
     public POV getPOV()
       {
          return Camera; 

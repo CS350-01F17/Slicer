@@ -1,5 +1,5 @@
 /*
-SlicerProject.pde
+SlicerProject.pdeP
 
 This Sketchbook tab contains the main code that runs the entire program. 
 
@@ -31,10 +31,10 @@ void setup() {
   String adress = "../../40mmcube.stl";
   STLParser parser = new STLParser(adress);
   ArrayList<Facet> data = parser.parseSTL();
-  test = new Model(data);  
+  test = new Model(data); 
   vis.CenterModelOnBuildPlate(test);
   vis.FocusOnModel(test);
-  test.Slice(.2, .1);
+
 }
 
 //After the setup function finishes, this function is called repeatedly until the
@@ -45,35 +45,99 @@ void draw() {
     // One and ONLY one of these function calls should be uncommented
     
     
-    //modelTranslationTest(); // Seems to work
+  //modelTranslationTest(); // Laggy
     
-    //modelScalingTest(); // Seems to work
+
+  //modelScalingTest(); // Seems to work
     
-    //rotationTest(); // Z axis rotation isn't correct
+  //rotationTest(); // Z axis rotation isn't correct
     
-    //ZoomTest();
+  //ZoomTest();
     
-    //testLayerRenderer();
-    //testFacetRenderer();
+  //testLayerRenderer();
+
+
+  
+  //testLayerVisibility();
+  
+  //testFacetRenderer();
     
-   //testSliceAndRender();
+
+   
+   testVisability();
    
    //modelRotationTest();
+
 
 }
 
 
-void testSliceAndRender()
+void testLayerVisibility() {
+  vis.SetMode(false);
+  test.Slice(0.2, 0.1);  
+  for (int i = 0; i < test.getLayerCount(); i++) {
+    // Problem: Visualizer is actually a FacetRenderer
+    // but we need a LayerRenderer
+    LayerRenderer r = (LayerRenderer) vis.GetVisualizer();
+    boolean[] barr = r.GetVisible();
+    for (int j = 0; j < barr.length; j++) {
+      if (j == i) barr[j] = true;
+      else barr[j] = false;
+    }
+    r.SetVisible(barr);
+
+    vis.SetVisualizer(r);
+    POV temp = vis.getPOV();
+    temp.setZoom(70);
+    vis.SetPOV(temp);
+}
+}
+
+
+int TVi = 0;
+void testVisability()
   {
-     vis.SetMode(false);
-     POV temp = vis.getPOV();
-     temp.setZoom(70);
-     vis.SetPOV(temp);
-     vis.Render(test, rendering);
-     
-     
-     image(rendering, 50 ,50);
+     test.Slice(.2, .1);
+    boolean[] visData = new boolean[test.getLayers().size()];
+    POV cam = vis.getPOV();
+     cam.setZoom(70);
+     vis.SetPOV(cam);
+    for(int i=0; i <test.getLayers().size(); i++)
+      {
+        visData[i] = false;
+      }
+      visData[TVi] = true;
+    vis.SetMode(false);
+        
+    LayerRenderer temp = (LayerRenderer)vis.getRenderer();  
+    temp.setVisability(visData);
+    vis.setRenderer(temp);
+    vis.Render(test, rendering);
+    image(rendering, 50 ,50);
+    print(TVi, "\n");
+    TVi++;
+    if(TVi >= test.getLayers().size())
+      {
+        TVi=0;
+      }
+        
   }
+
+
+
+
+void testSliceAndRender() {
+  vis.SetMode(false);
+  POV temp = vis.getPOV();
+  temp.setZoom(70);
+  vis.SetPOV(temp);
+  test.Slice(0.2, 0.1);
+  vis.Render(test, rendering);
+     
+     
+  image(rendering, 50 ,50);
+     
+}
 
 
 
