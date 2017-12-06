@@ -19,6 +19,7 @@ public class Line {
   public float x2;
   public float y2;
   public boolean isTravel;
+  public boolean isInfill;
 
 
   /**
@@ -30,12 +31,13 @@ public class Line {
    * @param  y2        The y value of the end point.
    * @param  isTravel  Denotes whether the current line is a toolpath travel line.
    */
-  public Line(float x1, float y1, float x2, float y2, boolean isTravel) {
+  public Line(float x1, float y1, float x2, float y2, boolean isTravel, boolean isInfill) {
     this.x1 = x1;
     this.y1 = y1;
     this.x2 = x2;
     this.y2 = y2;
     this.isTravel = isTravel;
+    this.isInfill = isInfill;
   }
 
 
