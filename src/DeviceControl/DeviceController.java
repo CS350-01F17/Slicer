@@ -128,9 +128,7 @@ public class DeviceController extends Thread {
     }
 
     if (!isJobRunning() && (sdaConnected || testMode)) {
-      thisApplet.saveStrings("print.gcode", GCodeFile.toArray(new String[GCodeFile.size()]));
-      //Store the GCode file internally, then start the printing thread
-      this.GCode = new ArrayList<String>(Arrays.asList(thisApplet.loadStrings("torus_flat.gcode")));
+      this.GCode = GCodeFile;
       jobRequest = true;
       return true;
     }

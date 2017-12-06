@@ -13,6 +13,7 @@ ArrayList<String> gcode;
    The setop and loop methods provide example usage for the DeviceController class
  */
 void setup() {
+  print(Serial.list());
   /*
       First, instantiate DeviceController. Three constructors are provided
    1) For immidiate connection to a serial port:
@@ -22,13 +23,15 @@ void setup() {
    */
 
   try {
-    devControl = new DeviceController(this, "/dev/ttyUSB0", 115200);
+    devControl = new DeviceController(this);
   }
   catch(RuntimeException e) {
     e.printStackTrace();
     println("Failed to open serial port, aborting");
     return;
   }
+
+  devControl.connectSerial("/dev/pts/3", 38400);
 
   /*
       2) For using test mode. A single boolean is provided.
