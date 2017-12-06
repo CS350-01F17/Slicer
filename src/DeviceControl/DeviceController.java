@@ -1,8 +1,8 @@
 /*
  Device Controller for a generic 3D printer
- 
+
  John Caley, Melissa Chillington, David Hanely, Steven Rollo
- 
+
  Usage:
  DeviceController can be created any time prior to or when the printer connection is started
  A serial port name and baud rate must be supplied in either the constructor, or the
@@ -11,9 +11,9 @@
  pause/resume/stopJob() control the state of the current print job
  Only one job can be run at once, isJobRunning() check if one is running
  Call disconnectSerial() prior to ending the program or dispoising of a DeviceController instance
- 
+
  processing.serial.* must also be imported in the main Processing applet to use this class
- 
+
  Some notes and thoughts:
  Having multiple instances of DeviceController is untested, and we are unsure
  how the Processing classes (Serial, PApplet) would react to such a situation
@@ -29,29 +29,25 @@ import processing.core.*;
 import processing.serial.*;
 import java.lang.Thread;
 import java.util.ArrayList;
-
+import java.util.Arrays;
 
 public class DeviceController extends Thread {
   /*
     Main constructor
-   */
+  */
   DeviceController(PApplet thisApplet) {
     this.thisApplet = thisApplet;
     sdaConnected = false;
   }
   /*
     Test mode constructor
-   */
+  */
   DeviceController(boolean testMode) {
     //Set test mode
     this.testMode = testMode;
     if (testMode) {
       System.out.println("Proceeding in test mode");
     }
-  }
-
-  //default constructor
-  DeviceController() {
   }
 
   //Starts a thread for serial communication
@@ -61,6 +57,19 @@ public class DeviceController extends Thread {
     this.baudRate = baudRate;
     Thread t = new Thread(this);
     t.start();
+  }
+
+  //closes serial port connection
+  public boolean disconnectSerial() {
+    if (serialCom != null && sdaConnected) {
+      synchronized(serialCom) {
+        serialCom.stop();
+      }
+      sdaConnected = false;
+      return true;
+    }
+    System.out.println("Serial port is already disconnected...");
+    return false;
   }
 
   //method used by thread
@@ -91,10 +100,8 @@ public class DeviceController extends Thread {
   }
 
   public boolean pauseJob() {
-    System.out.println("Enter Pause Method");
     synchronized(this) {
       pauseRequest = true;
-      System.out.println("Exit Pause Method");
       return true;
     }
   }
@@ -112,26 +119,6 @@ public class DeviceController extends Thread {
     }
   }
 
-  //Connects to a printer on the specified serial port Returns true if the connection was successful, or false if the connection failed
-  private boolean _connectSerial() {
-    if (!sdaConnected) {
-      try {
-        System.out.println("Connecting to printer on port " + port);
-        serialCom = new Serial(thisApplet, port, baudRate);
-        sdaConnected = true;
-
-        System.out.println("Connected to port " + port);
-        return true;
-      }
-      catch(RuntimeException e) {
-        System.out.println("Failed to open serial port, aborting");
-        return false;
-      }
-    }
-    System.out.println("Serial port is already connected...");
-    return false;
-  }
-
   //called to start a print job
   public boolean startPrintJob(ArrayList<String> GCodeFile) {
     //Reset stop/pause requests
@@ -141,8 +128,9 @@ public class DeviceController extends Thread {
     }
 
     if (!isJobRunning() && (sdaConnected || testMode)) {
+      thisApplet.saveStrings("print.gcode", GCodeFile.toArray(new String[GCodeFile.size()]));
       //Store the GCode file internally, then start the printing thread
-      this.GCode = GCodeFile;
+      this.GCode = new ArrayList<String>(Arrays.asList(thisApplet.loadStrings("torus_flat.gcode")));
       jobRequest = true;
       return true;
     }
@@ -171,7 +159,7 @@ public class DeviceController extends Thread {
     synchronized(serialCom) {
       serialCom.write("M110 N0\n");
     }
-    
+
     while (!testMode) {
       response = serialCom.readStringUntil('\r');
       if (response != null) {
@@ -270,16 +258,23 @@ public class DeviceController extends Thread {
     }
   }
 
-  //closes serial port connection
-  public boolean disconnectSerial() {
-    if (serialCom != null && sdaConnected) {
-      synchronized(serialCom) {
-        serialCom.stop();
+  //Connects to a printer on the specified serial port Returns true if the connection was successful, or false if the connection failed
+  private boolean _connectSerial() {
+    if (!sdaConnected) {
+      try {
+        System.out.println("Connecting to printer on port " + port);
+        serialCom = new Serial(thisApplet, port, baudRate);
+        sdaConnected = true;
+
+        System.out.println("Connected to port " + port);
+        return true;
       }
-      sdaConnected = false;
-      return true;
+      catch(RuntimeException e) {
+        System.out.println("Failed to open serial port, aborting");
+        return false;
+      }
     }
-    System.out.println("Serial port is already disconnected...");
+    System.out.println("Serial port is already connected...");
     return false;
   }
 
@@ -297,6 +292,8 @@ public class DeviceController extends Thread {
 
   private Serial             serialCom;
   private ArrayList<String>  GCode;
+  private ArrayList<String>  startCode;
+  private ArrayList<String>  stopCode;
   private PApplet            thisApplet;
   private String             port;
   private int                baudRate;
