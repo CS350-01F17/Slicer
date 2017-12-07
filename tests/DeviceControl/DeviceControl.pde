@@ -23,7 +23,7 @@ void setup() {
    */
 
   try {
-    devControl = new DeviceController(this);
+    devControl = new DeviceController(true);
   }
   catch(RuntimeException e) {
     e.printStackTrace();
@@ -53,7 +53,11 @@ void setup() {
 
   //Call the startPrintJob method with the provided gcode to start printing
   devControl.startPrintJob(gcode);
-
+  delay(10000);
+  devControl.pauseJob();
+  delay(1000);
+  devControl.stopJob();
+  devControl.startPrintJob(gcode);
   //Test pausing, resuming, and stopping the print job after various intervals
   /*delay(4000);
   println("Main thread requesting pause");
