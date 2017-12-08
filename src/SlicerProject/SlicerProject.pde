@@ -14,15 +14,19 @@ boolean drawLayer;
 // Once this function finished executing, the draw function is called (repeatedly).
 void setup() {
 
-  String stlDir ="%MODEL DIRECTORY%"; //directory path to directory where 3D models are stored 
-  String stlPath = "%STL PATH%"; //filename (or relative path from %stlDir%) of desired STL file 
+  String stlDir ="%Model Directory%"; //directory path to directory where 3D models are stored 
+  String stlPath = "%STLPATH%"; //filename (or relative path from %stlDir%) of desired STL file 
   String gcodeDir = "%GCODE DIRECTORY%"; //directory path to directory where gcode files should be stored, file will be named %stlPath%.gcode
 
   drawLayer = true; //true to draw layer, false to skip draw
   int layerToDraw = 0; // layer number to draw on the screen if drawLayer = true
+  int extruderTemperature = 205;
+  int bedTemperature = 50;
 
-  float layerHeight = %LAYER HEIGHT%; //a value from 0.3 (low quality) to 0.1 (high quality) specifying layer height
-  float infill = %INFILL PERCENT%; //infill percentage 
+  float layerHeight = .15; //a value from 0.3 (low quality) to 0.1 (high quality) specifying layer height
+  float infill = .1; //infill percentage 
+  float filamentDiameter = 1.75; // Commonly is 1.75
+  float nozzleDiameter = 0.4; // MPv2 printer uses 0.4
 
 
   // Parse the STL file.
@@ -32,11 +36,11 @@ void setup() {
 
   // Slice object; includes output for timing the slicing procedure.
   long startTime = millis();
-  Slicer slice = new Slicer(facets, layerHeight, infill);
+  Slicer slice = new Slicer(facets, layerHeight, infill, filamentDiameter, nozzleDiameter);
   ArrayList<Layer> layers = slice.sliceLayers();
 
-  PVector modelTranslation = new PVector(0,0,0); 
-  ArrayList<String> gCode = slice.createGCode(layers, %EXTRUDER TEMP%, %BED TEMP%, modelTranslation); //extruder should be between 200 and 210 for PLA, ABS should be between 220 and 240. Bed temp for PLA should be between 40 and 60 and 100 and 120 for ABS 
+  PVector modelTranslation = new PVector(0, 0, 0); 
+  ArrayList<String> gCode = slice.createGCode(layers, extruderTemperature, bedTemperature, modelTranslation); //extruder should be between 200 and 210 for PLA, ABS should be between 220 and 240. Bed temp for PLA should be between 40 and 60 and 100 and 120 for ABS 
 
   String[] gCodeArr = new String[gCode.size()];
   gCodeArr = gCode.toArray(gCodeArr);
@@ -44,13 +48,13 @@ void setup() {
   if (nameStart == -1)
   {
     nameStart = stlPath.lastIndexOf('/');
-    
+
     if (nameStart == -1)
     {
       nameStart = 0;
     }
   }
-  
+
   int nameEnd = stlPath.lastIndexOf('.');
   if (nameEnd == -1)
   {
@@ -58,9 +62,9 @@ void setup() {
   }
 
   String gCodeName = stlPath.substring(nameStart, nameEnd);
-  
+
   saveStrings(gcodeDir + gCodeName + ".gcode", gCodeArr);
-  
+
 
   long endTime = millis();
   println("\nTotal time: " + (endTime - startTime) + "ms");

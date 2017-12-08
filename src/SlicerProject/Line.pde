@@ -8,8 +8,8 @@ Line.pde
  represented as a 2D line segment made up of two points. Both points are publicly
  accessible.
  
+Authors: Slicing Team (Andrew Figueroa, Aaron Finnegan, Chris Iossa)
 
-Authors: Slicing Team (Andrew Figueroa, Chris Iossa)
 */
 
 public class Line {
@@ -39,7 +39,49 @@ public class Line {
     this.isTravel = isTravel;
     this.isInfill = isInfill;
   }
-
+  
+  public float getX1(){
+    return x1;
+  
+  }
+  
+   public float getX2(){
+    return x2;
+  
+  }
+  
+  public float getY1(){
+    return y1;
+  
+  }
+  public float getY2(){
+    return y2;
+  
+  }
+  public boolean getTravel(){
+    return isTravel;
+  }
+  
+  public void setX1(float x1){
+  this.x1 = x1;
+  }
+  
+  public void setX2(float x2){
+  this.x2 = x2;
+  }
+  
+   public void setY1(float y1){
+  this.y1 = y1;
+  }
+  
+  public void setY2(float y2){
+  this.y2 = y2;
+  }
+  
+  public void setTravel(Boolean isTravel){
+    this.isTravel= isTravel;
+  }
+  
 
   /*
   * returns the distance between this line and another Line @param lineIn 
@@ -76,4 +118,5 @@ public class Line {
     y2 = y1;
     y1 = temp;
   }
+
 }
