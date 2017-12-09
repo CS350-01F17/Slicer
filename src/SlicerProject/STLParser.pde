@@ -20,7 +20,10 @@ import java.nio.BufferUnderflowException;
 
 public class STLParser
 {
+
+  // Class attributes.
   private final String filePath;
+
 
   /**
    * Constructs an STLParser object given a file path to a .stl file. The path and file
@@ -99,8 +102,8 @@ public class STLParser
    * reported in the STL file does not match the number of facets interpreted, then null
    * is returned.
    *
-   * @param  stlContents  an array of bytes that represents the contents of a Binary STL file
-   * @return              an ArrayList<Facet> of facets that were represented by the contents
+   * @param  stlContents  an array of bytes that represents the contents of a Binary STL file.
+   * @return              an ArrayList<Facet> of facets that were represented by the contents.
    */
   private ArrayList<Facet> interpretBinarySTL(byte[] stlContents)
   {
@@ -120,7 +123,7 @@ public class STLParser
       try {
         // STL files store facet count as UINT32, Java/Processing does not have unsigned types.
         facetCount = Integer.toUnsignedLong(buffer.getInt());
-        println("STLParser.interpretBinarySTL(): STL Facet count: " + facetCount); // TODO: remove after development
+        // println("STLParser.interpretBinarySTL(): STL Facet count: " + facetCount); // Testing code during development to output facet count.
 
         if (facetCount < Integer.MAX_VALUE) // We cannot handle more than 2^31-1 facets due to ArrayList
         {

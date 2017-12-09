@@ -1,4 +1,4 @@
-/* //<>// //<>// //<>//
+/* //<>//
  Slicer.pde
  
  This Sketchbook tab holds the definition and implementation of the Slicer class.
@@ -25,6 +25,8 @@ import java.util.Iterator;
 
 public class Slicer
 {
+
+  // Class attributes.
   private TreeMap<Float, ArrayList<Facet>> lowVSort;
   private TreeMap<Float, ArrayList<Facet>> highVSort;
   private float extrudedAmount;
@@ -43,7 +45,7 @@ public class Slicer
 
 
   /**
-   * Constructor
+   * Constructor for a Slicer object with input from UI or runtime file.
    *
    * @param  facets  A representation of the facets that make up the 3D model
    * @param  layerHeight  The desired z-height of each layer in the sliced object. 
@@ -70,13 +72,12 @@ public class Slicer
     }
     this.infillPercentage = infill;
 
-    //TODO: get these six (five? - filamentDiam was not requested) values from the UI
     topBottomSize = 1.2; //thickness of solid top and bottom portions
     buildAreaX = 120;
     buildAreaY = 120;
     buildAreaZ = 120;
     nozzleDiam = nozzleDiameter; // MPv2 printer uses 0.4
-    filamentDiam = filamentDiameter; // Commonly is 1.72
+    filamentDiam = filamentDiameter; // PLA uses 1.75, ABS uses 3.0. These are then used as 0.175 and 0.3, respectively.
     xInit=0;
     yInit=0;
 
@@ -85,7 +86,7 @@ public class Slicer
     travelSpeed = 3000; //50 mm/s
 
     extrudedAmount = 0.0;
-    
+
     lowVSort = new TreeMap<Float, ArrayList<Facet>>();
     highVSort = new TreeMap<Float, ArrayList<Facet>>();
     if (facets != null && facets.size() > 0)
@@ -101,7 +102,7 @@ public class Slicer
         }
         sameMinZ.add(f);
       }
-  
+
       //create "psuedo-multimap" sorted low to high by the highest z-height
       for (Facet f : facets)
       {
@@ -113,8 +114,7 @@ public class Slicer
         }
         sameMaxZ.add(f);
       }
-    }
-    else
+    } else
     {
       println("Slicer.Slicer(): WARNING: facets was null or empty");
     }
@@ -141,18 +141,18 @@ public class Slicer
     layers.ensureCapacity((int)((highestZPos - lowestZPos) / layerHeight) + 1);
 
     //TODO: validate model size (should be smaller than build area)
-    
+
     for (float pos = lowestZPos; pos < highestZPos; pos += layerHeight)
     { 
       layers.add(sliceLayer(pos));
     }
-    
-    //get min and max x and y for model
+
+    // Get min and max x and y for model.
     float minX = Float.MAX_VALUE;
     float maxX = Float.MAX_VALUE * -1;
     float minY = Float.MAX_VALUE;
     float maxY = Float.MAX_VALUE * -1;
-    for (Layer la: layers)
+    for (Layer la : layers)
     {
       if (minX > getMinX(la))
       {
@@ -171,15 +171,18 @@ public class Slicer
         maxY = getMaxY(la);
       }
     }
-    
-    ArrayList<Layer> topAreas = getTopAreas(layers, topBottomSize); //<>//
-    
-    //add infill
+
+    // Add all layers that contain tops (read: roofs) to the ArrayList<> //<>//
+    ArrayList<Layer> topAreas = getTopAreas(layers, topBottomSize); 
+
+    // Add infill.
     for (int i = 0; i < layers.size(); i++)
     {
       Layer currLayer = layers.get(i);
+
+      // Alternate horizontal and vertical infill (read: x and y axis infill).
       boolean horizontal = i % 2 == 0;
-      
+
       if (i * layerHeight + lowestZPos < (lowestZPos + topBottomSize) || i * layerHeight + lowestZPos > (highestZPos - topBottomSize))
       {
         if (horizontal)
@@ -200,32 +203,32 @@ public class Slicer
         }
       }
     }
-    
-    //add solid top areas and add tool path
+
+    // Add solid top areas and add tool path
     for (int i = 0; i < layers.size(); i++)
     {
       Layer currLayer = layers.get(i);
-      
+
       ArrayList<Line> currLayerLines = new ArrayList<Line>(layers.get(i).getCoordinates());
-      
+
       if (i * layerHeight + lowestZPos < highestZPos - topBottomSize)
       {
         currLayerLines.addAll(topAreas.get(i).getCoordinates());
         currLayer.setCoordinates(currLayerLines);
       }
-      
+
       currLayer.setCoordinates( getToolPath(currLayer) );
     }
-    
+
 
     return layers;
   }
 
 
   /**
-   * Gets the RepRap GCode that can be used to print the 3D model
+   * Generates and returns the RepRap GCode that can be used to print the 3D model.
    *
-   * This method uses the information in layers to create RepRap GCode commands that can
+   * This method uses the information in layers to generate RepRap GCode commands that can
    * be sent to a compatable 3D printer in order to print the 3D model represented by
    * the given layers.
    *
@@ -236,44 +239,37 @@ public class Slicer
    */
   public ArrayList<String> createGCode(ArrayList<Layer> layers, int extTemp, int bedTemp, PVector modelOffset)
   {
-    ArrayList<String> gCode = null;
+    ArrayList<String> gCode = new ArrayList<String>();
+
+    // Preliminary check if the input layers is null. 
     if (layers == null)  return null;
 
-    gCode = new ArrayList<String>();
-
-    //calculate total number of expected GCode commands
+    // Calculate total number of expected GCode commands.
     int numLines = 0;
     for (Layer la : layers)
     {
       numLines += la.getCoordinates().size();
     }
 
-    // A comment for each layer, layer-to-layer travel + 29: 2 fan commands, 3 for header, 12 for start GCode,  12 for end GCode
+    // A comment for each layer, layer-to-layer travel + 29: 2 fan commands, 3 for header, 12 for start GCode,  12 for end GCode.
     final int numExtraStrings = layers.size() * 2 + 29;
 
+    // Set the capacity of the ArrayList<> so no resizing is done during GCode generation.
     gCode.ensureCapacity(numLines + numExtraStrings);
-    
-    /*
-    String gCodeHeader = ";FLAVOR:RepRap\r\n;Number of layers:" + layers.size() + "\r\n" +
-      ";generated by CS350 Slicer - https://github.com/CS350-01F17/Slicer";
-      */
+
+    // Header GCode. Contains miscellaneous information.
     gCode.add(";FLAVOR:RepRap");
     gCode.add(";Number of layers:" + layers.size());
     gCode.add(";generated by CS350 Slicer - https://github.com/CS350-01F17/Slicer");
-    
-      
-    //gCode.add(gCodeHeader);
-      
 
-    //TEMP: works for afig's test printer
-    // Add start GCode commands for each file. Changed from initial string as when sent to device control, would put all commands
-    // on the same line
+    // Temperature settings for the printer.
     gCode.add("M140 S" +bedTemp); //set bed temperatur (bedTemp deg C)
     gCode.add("M190 S" +bedTemp); //wait until this bed temperature is reached
     gCode.add("M104 S" +extTemp); //set extruder temperature (extTemp deg C)
     gCode.add("M109 S" +extTemp); //wait until this extruder temperature is reached
-    gCode.add("M207 S1 F2400");        //set retraction amount and speed 
-    
+    gCode.add("M207 S1 F2400");   //set retraction amount and speed 
+
+    // Positioning and movement information.
     gCode.add("G90 ; use absolute positioning");
     gCode.add("G28 ; home all axes");
     gCode.add("G1 Z0.2 F1200 ; raise nozzle 0.2mm");
@@ -287,14 +283,13 @@ public class Slicer
     {
       String layerComment = ";Layer: " + i;
       gCode.add(layerComment);
-      
+
       if (i == 0)
       {
         //turn fan off for the first layer
         String fanOff = "M106 S0";
         gCode.add(fanOff);
-      }
-      else if (i == 1)
+      } else if (i == 1)
       {
         //turn fan on for remaining layers
         String fanOn = "M106 S200"; //S represents speed, a PWM value from 0-255
@@ -307,15 +302,13 @@ public class Slicer
 
       float totalXOffset = (buildAreaX / 2) + modelOffset.x;
       float totalYOffset = (buildAreaY / 2) + modelOffset.y;
-      
+
       ArrayList<String> layerCommands = layerToGCode(layers.get(i), totalXOffset, totalYOffset, printSpeed, travelSpeed);
 
       gCode.addAll(layerCommands);
     }
 
-    //TEMP: works for afig's test printer
-    // Add end GCode commands for each file. Changed from initial string as when sent to device control, would put all commands
-    // on the same line
+    // End sequence GCode commands.
     gCode.add("M104 S0 ; turn off hotend heater");
     gCode.add("M140 S0 ; turn off bed heater");
     gCode.add("G91 ; switch to relative coordinates");
@@ -328,7 +321,7 @@ public class Slicer
     gCode.add("M84 ; disable motors");
     gCode.add("G4 S300 ; keep fan running for 300 seconds to cool hotend and allow the fan to be turned off");
     gCode.add("M106 S1 ; turn off fan");
-    
+
     println("Slicing has completed.\r\n"); // Let the console know when slicing has completed.
 
     return gCode;
@@ -348,21 +341,21 @@ public class Slicer
    */
   public Layer sliceLayer(float zPos)
   {
-    //create sub-maps containg only the facets that intersect the current z-height
+    // Create sub-maps containg only the facets that intersect the current z-height.
     NavigableMap<Float, ArrayList<Facet>> lowerFacets = lowVSort.headMap(zPos, true);
     NavigableMap<Float, ArrayList<Facet>> upperFacets = highVSort.tailMap(zPos, true);
 
-    //get a HashSet<Facet> of the facets that are in both submaps
+    // Get a HashSet<Facet> of the facets that are in both submaps.
     HashSet<Facet> allLowerFacets = extractFacets(lowerFacets.values());
     HashSet<Facet> allUpperFacets = extractFacets(upperFacets.values());
     allLowerFacets.retainAll(allUpperFacets);
     HashSet<Facet> intersectingFacets = allLowerFacets;
 
-    //create ArrayList to hold lines which represent the intersections at zPos
+    // Create ArrayList to hold lines which represent the intersections at zPos.
     ArrayList<Line> lines = new ArrayList<Line>();
     lines.ensureCapacity(intersectingFacets.size());
 
-    //this comparator compares the z value of two PVectors
+    // This comparator compares the z value of two PVectors.
     PVectorZComparator compZ = new PVectorZComparator();
 
     for (Facet f : intersectingFacets)
@@ -378,39 +371,43 @@ public class Slicer
 
       int numHigherVerts = numVerteciesAbove(f, zPos);
 
-      if (numHigherVerts == 0) //single point on current plane, 2 below
+      if (numHigherVerts == 0) // Single point on current plane, 2 below.
       {
         PVector p = getHighestZVertex(f);
         lines.add(new Line(p.x, p.y, p.x, p.y, false, false));
-      } else if (numHigherVerts == 1) //1 point above, 2 points below or on current plane 
+      } 
+      // 1 point above, 2 points below or on current plane.
+      else if (numHigherVerts == 1) 
       {
-        PVector[] sortedVerts = f.getVerticies(); //not sorted until next line
+        PVector[] sortedVerts = f.getVerticies(); // Not sorted until next line.
         Arrays.sort(sortedVerts, compZ);
 
-        //calculate first point
+        // Calculate first point.
         float liFactor1 = (zPos - sortedVerts[0].z) / (sortedVerts[2].z - sortedVerts[0].z); 
         PVector p1 = PVector.lerp(sortedVerts[0], sortedVerts[2], liFactor1);
 
-        //calculate second point
+        // Calculate second point.
         float liFactor2 = (zPos - sortedVerts[1].z) / (sortedVerts[2].z - sortedVerts[1].z); 
         PVector p2 = PVector.lerp(sortedVerts[1], sortedVerts[2], liFactor2);
 
-        //create line
+        // Create the new Line.
         lines.add(new Line(p1.x, p1.y, p2.x, p2.y, false, false));
-      } else //2 points above, 1 point below or on current plane
+      } 
+      // 2 points above, 1 point below or on current plane.
+      else 
       {
-        PVector[] sortedVerts = f.getVerticies(); //not sorted until next line
+        PVector[] sortedVerts = f.getVerticies(); // Not sorted until next line.
         Arrays.sort(sortedVerts, compZ);
 
-        //calculate first point
+        // Calculate first point.
         float liFactor1 = (zPos - sortedVerts[0].z) / (sortedVerts[1].z - sortedVerts[0].z);
         PVector p1 = PVector.lerp(sortedVerts[0], sortedVerts[1], liFactor1);
 
-        //calculate second point
+        // Calculate second point.
         float liFactor2 = (zPos - sortedVerts[0].z) / (sortedVerts[2].z - sortedVerts[0].z);
         PVector p2 = PVector.lerp(sortedVerts[0], sortedVerts[2], liFactor2);
 
-        //create line
+        // Create the new Line.
         lines.add(new Line(p1.x, p1.y, p2.x, p2.y, false, false));
       }
     }
@@ -420,10 +417,10 @@ public class Slicer
 
 
   /**
-   * Gets RepRap GCode that prints the given Layer
+   * Generates RepRap GCode that prints the given Layer.
    *
    * This method interpets a single layer object and creates GCode that can be used
-   * to print this layer on a RepRap compatable 3D printer
+   * to print this layer on a RepRap compatable 3D printer.
    *
    * @param  layer  The layer to create GCode instructions for
    * @param  extrudedAmount  the amount of filament extruded so far; modified in method
@@ -441,7 +438,7 @@ public class Slicer
     layerGCode = new ArrayList<String>();
     layerGCode.ensureCapacity(l.getCoordinates().size());
 
-    //travel to the first point in the layer
+    // Travel to the first point in the layer.
     if (l.getCoordinates().size() > 0)
     {
       Line li = l.getCoordinates().get(0);
@@ -453,6 +450,7 @@ public class Slicer
     {
       String command = "";
 
+      // If the line is a travel movement.
       if (li.isTravel)
       {
         layerGCode.add("G10"); //retract filament by value specified in M207
@@ -461,22 +459,23 @@ public class Slicer
           command += "G0 X" + (li.x2 + xOff) + " Y" + (li.y2 + yOff);
         } else
         {
-          
           command += "G0 F" + tSpeed + " X" + (li.x2 + xOff) + " Y" + (li.y2 + yOff);
           wasTravelling = true;
         }
         layerGCode.add("G11"); //unretract filament
-      } else
+      } 
+      // If the line is an extrusion.
+      else
       {
         /* Simple geometry: a printed line is a rectangular prism; the filament a cylinder.
          Find the volume of a printed line, and use that to determine the necessary 
          height of the cylinder (i.e. length of filament) that matches that volume.   */
         float lineVol = layerHeight * nozzleDiam * dist(li.x1, li.y1, li.x2, li.y2);
-        //println("layerToGCode(): LineVol: " + lineVol + " for Line: [" + (li.x1 + xOff) +
-        //        ", " + (li.y1 + yOff) + ", " + (li.x2 + xOff) + ", " + (li.y2 + yOff) + "]" + "  dist: " + dist(li.x1, li.y1, li.x2, li.y2));
+        //println("layerToGCode(): LineVol: " + lineVol + " for Line: [" + (li.x1 + xOff) + ", " + (li.y1 + yOff) + ", " + (li.x2 + xOff) + ", " + (li.y2 + yOff) + "]" + "  dist: " + dist(li.x1, li.y1, li.x2, li.y2)); // Debug line for Line information.
+
         if (lineVol != 0)
         {
-          //println("\tAmount added: " + (lineVol / (float)(Math.PI * Math.pow(filamentDiam, 2))));
+          //println("\tAmount added: " + (lineVol / (float)(Math.PI * Math.pow(filamentDiam, 2)))); // Debug line for extrusion amount.
           extrudedAmount += (float) lineVol / (Math.PI * Math.pow(filamentDiam / 2, 2));
         }
 
@@ -492,12 +491,13 @@ public class Slicer
 
       layerGCode.add(command);
     }
+
     return layerGCode;
   }
 
 
   /**
-   * Adds horizontal structural infill to the given layer
+   * Adds horizontal structural infill to the given layer (read: going along the X axis).
    *
    * This method adds Line objects to the given Layer that represent infill. The
    * given layer must represent a closed figure. If a non-closed figure is
@@ -519,11 +519,11 @@ public class Slicer
 
     ArrayList<Line> lines = layer.getCoordinates();
 
-    //create "psuedo-multimap" sorted low to high by the lowest y-value
+    // Create "psuedo-multimap" sorted low to high by the lowest y-value.
     TreeMap<Float, ArrayList<Line>> lowLSort = new TreeMap<Float, ArrayList<Line>>();
     for (Line l : lines)
     {
-      if (l.y1 != l.y2) //do not include horizontal lines
+      if (l.y1 != l.y2) // Do not include horizontal lines.
       {
         Float minY = min(l.y1, l.y2);
         ArrayList<Line> sameMinY = lowLSort.get(minY);
@@ -535,11 +535,11 @@ public class Slicer
       }
     }
 
-    //create "psuedo-multimap" sorted low to high by the highest y-value
+    // Create "psuedo-multimap" sorted low to high by the highest y-value.
     TreeMap<Float, ArrayList<Line>> highLSort = new TreeMap<Float, ArrayList<Line>>();
     for (Line l : lines)
     {
-      if (l.y1 != l.y2) //do not include horizontal lines
+      if (l.y1 != l.y2) // Do not include horizontal lines.
       {
         Float maxY = max(l.y1, l.y2);
         ArrayList<Line> sameMaxY = highLSort.get(maxY);
@@ -551,8 +551,8 @@ public class Slicer
       }
     }
 
-    int numScanLines = (int)(buildAreaY / nozzleDiam);
-    int numDrawnLines = (int) (numScanLines * infill);
+    int numScanLines = (int)(buildAreaY / nozzleDiam); // The number of lines to possibly draw based on build area and the diameter of the nozzle. 
+    int numDrawnLines = (int) (numScanLines * infill); // The number of lines to possible draw based on scan lines and infill percentage.
     float interval = numScanLines / numDrawnLines * nozzleDiam;
 
     for (float currScan = yStart; currScan < yEnd; currScan += interval)
@@ -560,46 +560,45 @@ public class Slicer
       NavigableMap<Float, ArrayList<Line>> lowerLines = lowLSort.headMap(currScan, true);
       NavigableMap<Float, ArrayList<Line>> upperLines = highLSort.tailMap(currScan, true);
 
-      //get a HashSet<Line> of the lines that are in both submaps
+      // Get a HashSet<Line> of the lines that are in both submaps.
       HashSet<Line> allLowerLines = extractLines(lowerLines.values());
       HashSet<Line> allUpperLines = extractLines(upperLines.values());
       allLowerLines.retainAll(allUpperLines);
       HashSet<Line> ixLines = allLowerLines;
       int numLines = ixLines.size();
 
-
+      // Skip over non-closed sections of the model.
       if (numLines % 2 != 0)
       {
         println("Slicer.addInfill(): Non-closed figure at layer height: "+ layer.zHeight +
           " and yPos: " + currScan);
       } else
       {
-        //sort lines by their mininum x value
+        // Sort lines by their mininum x value.
         ArrayList<Line> sortByMinX = new ArrayList<Line>(ixLines);
         sortByMinX.sort(new LineMinXComparator());
 
         Float x1 = null;
         for (Line l : sortByMinX)
         {
-          //start + (stop-start) * amount
+          // Start + (stop-start) * amount.
           float liFactor = (currScan - l.y1) / (l.y2 - l.y1);
 
           if (x1 == null)
           {
-            //calculate first point
+            // Calculate first point.
             x1 = (l.x2 - l.x1) * liFactor + l.x1;
           } else
           {
-            //calculate second point
+            // Calculate second point.
             Float x2 = (l.x2 - l.x1) * liFactor + l.x1;
 
             //TODO: When walls are added, the next conditional and the WALL constant will need to vary based on the number of walls
             if (abs(x2 - x1) > nozzleDiam)
             {
-              //add travel to layer
-              
-              final float WALL = nozzleDiam / 2; //stop infill nozzleDiam/2 away from edge
-              
+              // Add travel to layer.
+              final float WALL = nozzleDiam / 2; // Stop infill nozzleDiam/2 away from edge.
+
               layer.addLine(new Line(x1 + WALL, currScan, x2 - WALL, currScan, false, true));
             }
 
@@ -608,11 +607,12 @@ public class Slicer
         }
       }
     }
+
     return layer;
   }
 
   /**
-   * Adds vertical structural infill to the given layer
+   * Adds vertical structural infill to the given layer (read: going along the Y axis).
    *
    * This method adds Line objects to the given Layer that represent infill. The
    * given layer must represent a closed figure. If a non-closed figure is
@@ -627,6 +627,8 @@ public class Slicer
    */
   private Layer addYInfill(Layer layer, float infill, float xStart, float xEnd)
   {
+
+    // Preliminary check to make sure layer is not null or infill is not 0.
     if (layer == null || infill == 0.0 || layer.getCoordinates().size() == 0)
     {
       return layer;
@@ -634,11 +636,11 @@ public class Slicer
 
     ArrayList<Line> lines = layer.getCoordinates();
 
-    //create "psuedo-multimap" sorted low to high by the lowest y-value
+    // Create "psuedo-multimap" sorted low to high by the lowest y-value.
     TreeMap<Float, ArrayList<Line>> lowLSort = new TreeMap<Float, ArrayList<Line>>();
     for (Line l : lines)
     {
-      if (l.x1 != l.x2) //do not include vertical lines
+      if (l.x1 != l.x2) // Do not include vertical lines.
       {
         Float minX = min(l.x1, l.x2);
         ArrayList<Line> sameMinX = lowLSort.get(minX);
@@ -650,11 +652,11 @@ public class Slicer
       }
     }
 
-    //create "psuedo-multimap" sorted low to high by the highest y-value
+    // Create "psuedo-multimap" sorted low to high by the highest y-value.
     TreeMap<Float, ArrayList<Line>> highLSort = new TreeMap<Float, ArrayList<Line>>();
     for (Line l : lines)
     {
-      if (l.x1 != l.x2) //do not include vertical lines
+      if (l.x1 != l.x2) // Do not include vertical lines.
       {
         Float maxX = max(l.x1, l.x2);
         ArrayList<Line> sameMaxX = highLSort.get(maxX);
@@ -666,8 +668,8 @@ public class Slicer
       }
     }
 
-    int numScanLines = (int)(buildAreaX / nozzleDiam);
-    int numDrawnLines = (int) (numScanLines * infill);
+    int numScanLines = (int)(buildAreaX / nozzleDiam); // The number of lines to possibly draw based on build area and the diameter of the nozzle. 
+    int numDrawnLines = (int) (numScanLines * infill); // The number of lines to possible draw based on scan lines and infill percentage.
     float interval = numScanLines / numDrawnLines * nozzleDiam;
 
     for (float currScan = xStart; currScan < xEnd; currScan += interval)
@@ -675,45 +677,45 @@ public class Slicer
       NavigableMap<Float, ArrayList<Line>> lowerLines = lowLSort.headMap(currScan, true);
       NavigableMap<Float, ArrayList<Line>> upperLines = highLSort.tailMap(currScan, true);
 
-      //get a HashSet<Line> of the lines that are in both submaps
+      // Get a HashSet<Line> of the lines that are in both submaps.
       HashSet<Line> allLowerLines = extractLines(lowerLines.values());
       HashSet<Line> allUpperLines = extractLines(upperLines.values());
       allLowerLines.retainAll(allUpperLines);
       HashSet<Line> ixLines = allLowerLines;
       int numLines = ixLines.size();
 
+      // Skip over non-closed sections of the model.
       if (numLines % 2 != 0)
       {
         println("Slicer.addInfill(): Non-closed figure at layer height: "+ layer.zHeight +
           " and xPos: " + currScan);
       } else
       {
-        //sort lines by their mininum y value
+        // Sort lines by their mininum y value.
         ArrayList<Line> sortByMinY = new ArrayList<Line>(ixLines);
         sortByMinY.sort(new LineMinYComparator());
 
         Float y1 = null;
         for (Line l : sortByMinY)
         {
-          //start + (stop-start) * amount
+          // Start + (stop-start) * amount.
           float liFactor = (currScan - l.x1) / (l.x2 - l.x1);
 
           if (y1 == null)
           {
-            //calculate first point
+            // Calculate first point.
             y1 = (l.y2 - l.y1) * liFactor + l.y1;
           } else
           {
-            //calculate second point
+            // Calculate second point.
             Float y2 = (l.y2 - l.y1) * liFactor + l.y1;
 
             //TODO: When walls are added, the next conditional and the WALL constant will need to vary based on the number of walls
             if (abs(y2 - y1) > nozzleDiam)
             {
-              //add travel to layer
-              
+              // Add travel to layer.
               final float WALL = nozzleDiam / 2;
-              
+
               layer.addLine(new Line(currScan, y1 + WALL, currScan, y2 - WALL, false, true));
             }
 
@@ -722,9 +724,10 @@ public class Slicer
         }
       }
     }
+
     return layer;
   }
-  
+
   /**
    * This method determines the "top" areas of a model and adds infill to those areas
    *
@@ -740,15 +743,16 @@ public class Slicer
   private ArrayList<Layer> getTopAreas(ArrayList<Layer> layers, float topDistance)
   { 
     if (layers == null || topDistance < 0) return null;
-    
+
     ArrayList<Layer> topAreas = new ArrayList<Layer>();
-    
-    //get min and max x and y for model
+
+    // Get min and max x and y for model.
     float minX = Float.MAX_VALUE;
     float maxX = Float.MAX_VALUE * -1;
     float minY = Float.MAX_VALUE;
     float maxY = Float.MAX_VALUE * -1;
-    for (Layer la: layers)
+
+    for (Layer la : layers)
     {
       if (minX > getMinX(la))
       {
@@ -767,15 +771,16 @@ public class Slicer
         maxY = getMaxY(la);
       }
     }
-    
+
     ArrayList<Layer> solidModel = new ArrayList<Layer>();
-    for (Layer la: layers)
+    for (Layer la : layers)
     {
       solidModel.add(new Layer(la.getCoordinates(), la.zHeight));
     }
-    
+
     for (int i = 0; i < solidModel.size(); i++)
     {
+      // Alternate between horizontal and vertical infill for layers.
       if (i % 2 == 0)
       {
         addXInfill(solidModel.get(i), 1.0, minY, maxY);
@@ -784,17 +789,17 @@ public class Slicer
         addYInfill(solidModel.get(i), 1.0, minX, maxX);
       }
     }
-    
-    int lookAhead = (int)(topDistance / layerHeight); //number of layers to look ahead
+
+    int lookAhead = (int)(topDistance / layerHeight); // Number of layers to look ahead.
     for (int i = 0; i < solidModel.size() - lookAhead; i++)
     {
       ArrayList<Line> currLayerLines = new ArrayList<Line>(solidModel.get(i).getCoordinates());
       ArrayList<Line> lookAheadLines = new ArrayList<Line>(solidModel.get(i + lookAhead).getCoordinates());
       ArrayList<Line> topAreaInfill = new ArrayList<Line>();
-      
-      //remove non-infill lines
+
+      // Remove non-infill lines for current layer lines.
       Iterator<Line> currIt = currLayerLines.iterator();
-      while(currIt.hasNext())
+      while (currIt.hasNext())
       {
         Line currLine = currIt.next();
         if (!currLine.isInfill)
@@ -802,8 +807,10 @@ public class Slicer
           currIt.remove();
         }
       }
+
+      // Remove non-infill lines for look ahead lines.
       Iterator<Line> laIt = lookAheadLines.iterator();
-      while(laIt.hasNext())
+      while (laIt.hasNext())
       {
         Line currLine = laIt.next();
         if (!currLine.isInfill)
@@ -811,14 +818,16 @@ public class Slicer
           laIt.remove();
         }
       }
-      
+
+      // Alternation between horizontal and vertical lines to add to current layer and look ahead layers.
+      // Check for Horizontal.
       if (i % 2 != 0)
       {
         for (float currScan = minX; currScan < maxX; currScan += nozzleDiam)
         {
           ArrayList<Line> currLayerX = new ArrayList<Line>();
           ArrayList<Line> lookAheadLayerX = new ArrayList<Line>();
-          
+
           for (Line li : currLayerLines)
           {
             if (li.x1 == currScan)
@@ -826,7 +835,7 @@ public class Slicer
               currLayerX.add(li);
             }
           }
-          
+
           for (Line li : lookAheadLines)
           {
             if (li.x1 == currScan)
@@ -834,15 +843,15 @@ public class Slicer
               lookAheadLayerX.add(li);
             }
           }
-          
-          
+
+
           for (Line ClLi : currLayerX)
           { 
             if (lookAheadLayerX.size() == 0)
             {
               topAreaInfill.add(ClLi);
             }
-            
+
             for (Line LaLi : lookAheadLayerX)
             {
               if (ClLi.y1 < LaLi.y1)
@@ -856,15 +865,16 @@ public class Slicer
               }
             }
           }
-          
         }
-      } else
+      } 
+      // Check for Vertical.
+      else
       {
         for (float currScan = minY; currScan < maxY; currScan += nozzleDiam)
         {
           ArrayList<Line> currLayerY = new ArrayList<Line>();
           ArrayList<Line> lookAheadLayerY = new ArrayList<Line>();
-          
+
           for (Line li : currLayerLines)
           {
             if (li.y1 == currScan)
@@ -872,7 +882,7 @@ public class Slicer
               currLayerY.add(li);
             }
           }
-          
+
           for (Line li : lookAheadLines)
           {
             if (li.y1 == currScan)
@@ -880,14 +890,14 @@ public class Slicer
               lookAheadLayerY.add(li);
             }
           }
-          
+
           for (Line ClLi : currLayerY)
           {
             if (lookAheadLayerY.size() == 0)
             {
               topAreaInfill.add(ClLi);
             }
-            
+
             for (Line LaLi : lookAheadLayerY)
             {
               if (ClLi.x1 < LaLi.x1)
@@ -903,10 +913,11 @@ public class Slicer
           }
         }
       }
-      
+
+      // Add the horizontal or vertical infill layer to the list of top areas.
       topAreas.add(new Layer(topAreaInfill, layers.get(i).zHeight));
     }
-    
+
     return topAreas;
   }
 
@@ -921,6 +932,7 @@ public class Slicer
   {
     PVector[] verts = f.getVerticies();
     PVector lowest = verts[0];
+
     if (verts[1].z < lowest.z)
     {
       lowest = verts[1];
@@ -943,6 +955,7 @@ public class Slicer
   {
     PVector[] verts = f.getVerticies();
     PVector highest = verts[0];
+
     if (verts[1].z > highest.z)
     {
       highest = verts[1];
@@ -965,6 +978,8 @@ public class Slicer
   {
     ArrayList<Line> lines = l.getCoordinates();  
     Float minY = null;
+
+    // Check to make sure the Line contains points.
     if (lines != null && lines.size() > 0)
     {
       minY = lines.get(0).y1;
@@ -995,6 +1010,8 @@ public class Slicer
   {
     ArrayList<Line> lines = l.getCoordinates();  
     Float maxY = null;
+
+    // Check to make sure the Line contains points.
     if (lines != null && lines.size() > 0)
     {
       maxY = lines.get(0).y1;
@@ -1025,6 +1042,8 @@ public class Slicer
   {
     ArrayList<Line> lines = l.getCoordinates();  
     Float maxX = null;
+
+    // Check to make sure the Line contains points.
     if (lines != null && lines.size() > 0)
     {
       maxX = lines.get(0).x1;
@@ -1055,6 +1074,8 @@ public class Slicer
   {
     ArrayList<Line> lines = l.getCoordinates();  
     Float minX = null;
+
+    // Check to make sure the Line contains points.
     if (lines != null && lines.size() > 0)
     {
       minX = lines.get(0).x1;
@@ -1126,6 +1147,7 @@ public class Slicer
   {
     int count = 0;
     PVector[] verts = f.getVerticies();
+
     for (PVector v : verts)
     {
       if (v.z > zPos)
@@ -1137,30 +1159,35 @@ public class Slicer
   }
 
   /**
-   *  Determines the actual travels needed to print a sliced layer object
-   *  in the order of lines in the array list, a line is added from the endpoint of the previous line (line 0 uses origin of (0,0) )
-   *  to the startpoint of the next line in the array list.
+   *  This method determines the actual travels needed to print a sliced layer object
+   *  in the order of lines in the array list, a line is added from the endpoint of the 
+   *  previous line (line 0 uses origin of (0,0) ) to the startpoint of the next line in the array list.
    *
    *  @param    layer  the layer for which the tool path is to be extracted
    *  @param    xInit  initial x position of the extruder
    *  @param    yInit  initial y position of the extruder
    *  @returns  an ArrayList of all print lines and travel lines
    */
-  private ArrayList getToolPath(Layer l)
+  private ArrayList<Line> getToolPath(Layer l)
   {
-    if (l == null) return null;
-    if (l.getCoordinates().size() == 0) return new ArrayList<Line>();
-    
-    ArrayList<Line> layerLines = l.getCoordinates(); //get all the lines in the layer
-    ArrayList<Line> toolPath = new ArrayList(); //array list of lines to represent extruder movements
-    toolPath.add(0, new Line(xInit, yInit, xInit, yInit, true, false)); //adds a travel move from initial position to inital position, this will be removed at the end of the algorithm
 
-    while (layerLines.size() != 0) //loops until every Line has been found
+    // Preliminary check to make sure the Layer is not null.
+    if (l == null) return null;
+
+    if (l.getCoordinates().size() == 0) return new ArrayList<Line>();
+
+    ArrayList<Line> layerLines = l.getCoordinates(); // Get all the lines in the layer.
+    ArrayList<Line> toolPath = new ArrayList(); // Array list of lines to represent extruder movements.
+    toolPath.add(0, new Line(xInit, yInit, xInit, yInit, true, false)); // Adds a travel move from initial position to inital position; this will be removed at the end of the algorithm.
+
+    // Loop until every Line has been found.
+    while (layerLines.size() != 0) 
     {
-      Line currLine = toolPath.get(toolPath.size()-1); // Line from which the extruder will be moving from
-      Line checkLine = layerLines.get(0); //Line whose distance is being checked  
-      Line closeLine = checkLine; //Line which is the closest to currLine
-      float minDist = currLine.getDist(checkLine); //distance between currLine and checkLine
+      Line currLine = toolPath.get(toolPath.size()-1); // Line from which the extruder will be moving from.
+      Line checkLine = layerLines.get(0); // Line whose distance is being checked.
+      Line closeLine = checkLine; // Line which is the closest to currLine.
+      float minDist = currLine.getDist(checkLine); // Distance between currLine and checkLine.
+
       for (int i = 0; i<layerLines.size()-1; i++) 
       {
         checkLine = layerLines.get(i);
@@ -1170,14 +1197,17 @@ public class Slicer
           minDist = currLine.getDist(closeLine);
         }
       }
-      if (minDist > nozzleDiam - .002) //if the distance is greater than nozzle diameter then a travel from currLine to closeLine is needed. 
+
+      if (minDist > nozzleDiam - .002) // If the distance is greater than nozzle diameter then a travel from currLine to closeLine is needed. 
       {
         toolPath.add(toolPath.size(), new Line(toolPath.get(toolPath.size()-1).x2, toolPath.get(toolPath.size()-1).y2, closeLine.x1, closeLine.y1, true, false));
       }
+
       toolPath.add(toolPath.size(), closeLine);
-      layerLines.remove(closeLine);
+      layerLines.remove(closeLine); // Remove the line once completed.
     }
-    toolPath.remove(0); //removes the psudeo travel move at position 0
+
+    toolPath.remove(0); // Removes the psudeo travel move at position 0.
     xInit = toolPath.get((toolPath.size()-1)).x2;
     yInit = toolPath.get((toolPath.size()-1)).y2;
     return toolPath;

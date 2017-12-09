@@ -32,6 +32,8 @@ import java.nio.BufferOverflowException;
 
 public class STLConverter
 { 
+
+  // Class attributes.
   private String path;
   private byte[] binarySTL = null;
   private int byteCount = 0;
@@ -105,6 +107,12 @@ public class STLConverter
       }
 
       facetCount = stringsToConvert.size() / 12;
+
+      if (facetCount > Integer.MAX_VALUE || facetCount < 0)
+      {
+        println("Cannot convert a model with more than 2,147,483,647 facets or less than 0 facets.\r\n");
+        return null;
+      }
 
       // Create the ByteBuffer to store all bytes before assigning to byte[]
       ByteBuffer buffer = ByteBuffer.allocate(byteCount);
@@ -258,13 +266,13 @@ public class STLConverter
     Pattern p = Pattern.compile("-?[0-9]+\\.[0-9]+[Ee]?[-+]?[0-9]*|-?[0-9]+"); // Matches normal floats, scientific notation floats, or single integers.
     Matcher m;
 
-    // Preliminary check to make sure lines is not empty
+    // Preliminary check to make sure lines is not empty.
     if (lines == null || lines.length == 0)
     {
       return false;
     }
 
-    // Reserve 80 bytes for the header, and 4 bytes for the number of facets
+    // Reserve 80 bytes for the header, and 4 bytes for the number of facets.
     byteCount = headerBytes + floatBytes;
 
 
@@ -277,11 +285,11 @@ public class STLConverter
       return false;
     }
 
-    // Loop through each line and apply the regex matching
+    // Loop through each line and apply the regex matching.
     for (int i = startIndex; i < lines.length; i++)
     {
       m = p.matcher(lines[i]);
-      
+
       // Add matched content (matcher group()) to the private ArrayList<String>
       while (m.find())
       {

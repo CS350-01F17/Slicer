@@ -1,26 +1,28 @@
 /*
 Model.pde
-
-This Sketchbook tab holds the definition and implementation of the Model class.
-
-The Model class serves as a central object to hold the 3d model currently being
+ 
+ This Sketchbook tab holds the definition and implementation of the Model class.
+ 
+ The Model class serves as a central object to hold the 3d model currently being
  processed. It also contains various methods to manipulate the model, including scaling
  and rotations. Performing these modifications results in the facets that make up the
  object being modified, along with properties that hold information about these
  modifications. Finally, the Model class also provides a method to obtain strings
  that make up an STL file that represents the current state of the model.
-
-Authors: Slicing Team (Andrew Figueroa)
-*/
+ 
+ Authors: Slicing Team (Andrew Figueroa)
+ */
 
 public class Model
 {
+
+  // Class attributes. 
   private ArrayList<Facet> facets;
   private boolean isModified;
   private PVector scaling;
   private PVector rotation;
   private PVector translation;
-  
+
   /**
    * Constructor for a Model object given an ArrayList<Facet>.
    *
@@ -34,7 +36,7 @@ public class Model
     rotation = new PVector(0, 0, 0);
     translation = new PVector(0, 0, 0);
   }
-  
+
   /**
    * This method will return the ArrayList<Facet> of this object.
    *
@@ -44,7 +46,7 @@ public class Model
   {
     return facets;
   }
-  
+
   /**
    * This method will set this object's facet list with the input ArrayList<Facet>.
    *
@@ -53,7 +55,7 @@ public class Model
   public void setFacets(ArrayList<Facet> newFacets) {
     facets = newFacets;
   }
-  
+
   /**
    * this method will return the scaling values for this model.
    *
@@ -61,11 +63,13 @@ public class Model
    */
   public PVector getScale()
   {
-    return scaling; 
+    return scaling;
   }
-  
+
   /**
    * This method will set the scaling of this model to the input.
+   * TODO: Set scaling. This was originally going to be done by the Render group, and this method serves
+   * as a placeholder.
    *
    * @param  amount  The PVector (x, y, z) values to set the scaling.
    */
@@ -73,7 +77,7 @@ public class Model
   {
     isModified = checkModifications();
   }
-  
+
   /**
    * This method will return the rotation values for this model.
    *
@@ -81,11 +85,13 @@ public class Model
    */
   public PVector getRoatation()
   {
-    return rotation; 
+    return rotation;
   }
-  
+
   /** 
    * This method will set the rotation of this model to the input.
+   * TODO: Set rotation. This was originally going to be done by the Render group, and this method serves
+   * as a placeholder.
    *
    * @param  amount  The PVector (x, y, z) values to set the rotation.
    */
@@ -93,7 +99,7 @@ public class Model
   {
     isModified = checkModifications();
   }
-  
+
   /** 
    * This method will return the translation values for this model.
    *
@@ -103,9 +109,11 @@ public class Model
   {
     return translation;
   }
-  
+
   /**
    * This method will set the translation of this model to the input.
+   * TODO: Set translation. This was originally going to be done by the Render group, and this method serves
+   * as a placeholder.
    *
    * @param  amount  The PVector (x, y, z) values to set the translation.
    */
@@ -114,7 +122,7 @@ public class Model
     translation = amount;
     isModified = checkModifications();
   }
-  
+
   /**
    * This method will determine if one PVector is equal to another based on their 3 values.
    *
@@ -126,7 +134,7 @@ public class Model
   {
     return a.x == b.x && a.y == b.y && a.z == b.z;
   }
-  
+
   /**
    * This method will determine if the scaling, rotation, or translation
    * of the model was changed.
@@ -137,6 +145,6 @@ public class Model
   {
     PVector origin = new PVector(0, 0, 0);
     return pVectorEquals(scaling, origin) && pVectorEquals(rotation, origin)
-           && (pVectorEquals(translation, origin));
+      && (pVectorEquals(translation, origin));
   }
 }
