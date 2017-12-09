@@ -5,8 +5,7 @@
 
  Usage:
  DeviceController can be created any time prior to or when the printer connection is started
- A serial port name and baud rate must be supplied in either the constructor, or the
- connectSerial() method in order to connect to a printer
+ A serial port name and baud rate must be supplied to the connectSerial() method in order to connect to a printer
  Printing jobs can be started with startPrintJob() - see the method for more info
  pause/resume/stopJob() control the state of the current print job
  Only one job can be run at once, isJobRunning() check if one is running
@@ -23,7 +22,8 @@
  We need access to PApplet in the external class to use processing's serial
  lib. We also need Thread so the serial communications can be run in parallel
  with the rest of the program
- */
+*/
+
 
 import processing.core.*;
 import processing.serial.*;
@@ -31,16 +31,37 @@ import java.lang.Thread;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+/**
+ * Device Controller for a generic 3D printer
+ * <p>
+ * DeviceController can be created any time prior to or when the printer connection is started
+ * A serial port name and baud rate must be supplied to the connectSerial() method in order to connect to a printer
+ * Printing jobs can be started with startPrintJob() - see the method for more info
+ * pause/resume/stopJob() control the state of the current print job
+ * Only one job can be run at once, isJobRunning() check if one is running
+ * Call disconnectSerial() prior to ending the program or dispoising of a DeviceController instance
+ * processing.serial.* must also be imported in the main Processing applet to use this class
+ *
+ * @version 0.1
+ *
+ */
 public class DeviceController extends Thread {
-  /*
-    Main constructor
+  /**
+   * Main constructor
+   * @param thisApplet The parent processing applet for the program. The Serial classes
+   *                   used internally will be scoped to this PApplet
   */
+
   DeviceController(PApplet thisApplet) {
     this.thisApplet = thisApplet;
     sdaConnected = false;
   }
-  /*
-    Test mode constructor
+
+  /**
+   * Test mode constructor
+   * @param testMode When set to true, the device controller will be launched in test testMode.
+   *                 While in test mode, print jobs can be stopped and started, but no commands
+   *                 will be sent to a printer.
   */
   DeviceController(boolean testMode) {
     //Set test mode
@@ -50,8 +71,11 @@ public class DeviceController extends Thread {
     }
   }
 
-  //Starts a thread for serial communication
-  //Returns false if the serial port is already connected
+  /**
+   * Starts a thread for serial communication
+   * @param port A string containing the name of the serial port to connect to
+   * @param baudRate The baud rate of the serial port to connect to
+  */
   public void connectSerial(String port, int baudRate) {
     this.port = port;
     this.baudRate = baudRate;
@@ -59,9 +83,12 @@ public class DeviceController extends Thread {
     t.start();
   }
 
-  //closes serial port connection
+  /**
+   * Closes serial port connection
+   * @return Returns true if the serial port was disconnected successfuly
+  */
   public boolean disconnectSerial() {
-    if (serialCom != null && sdaConnected) {
+    if (serialCom != null && serialConnected()) {
       synchronized(serialCom) {
         serialCom.stop();
       }
@@ -72,13 +99,18 @@ public class DeviceController extends Thread {
     return false;
   }
 
-  //method used by thread
+  /**
+   * Main method used by the DeviceController thread. Please do not call this,
+   * it is only public because of the structure of the Thread class
+  */
   public void run() {
-    if (_connectSerial()) {
-      while (sdaConnected) {
+    if (testMode || _connectSerial()) {
+      while (testMode || serialConnected()) {
         if (jobRequest) {
+          synchronized(this) {
+            jobRequest = false;
+          }
           runPrintJob();
-          jobRequest = false;
         } else {
           try {
             sleep(10);
@@ -91,35 +123,86 @@ public class DeviceController extends Thread {
     }
   }
 
+  /**
+   * Requestes that the DeviceController stop a currently running print job
+   * @deprecated The return value will be removed in a future version
+  */
   public boolean stopJob() {
     synchronized(this) {
       pauseRequest = false;
       stopRequest = true;
-      return true;
     }
+    return true;
   }
 
+  /**
+   * Requestes that the DeviceController pause a currently running print job
+   * @deprecated The return value will be removed in a future version
+  */
   public boolean pauseJob() {
     synchronized(this) {
       pauseRequest = true;
-      return true;
     }
+    return true;
   }
 
+  /**
+   * Requestes that the DeviceController resume a currently paused print job
+   * @deprecated The return value will be removed in a future version
+  */
   public boolean resumeJob() {
     synchronized(this) {
       pauseRequest = false;
-      return true;
+    }
+    return true;
+  }
+
+  /**
+   * Checks if DeviceController is connected to a serial import
+   * @return Returns true if a serial port is connected
+  */
+  public boolean serialConnected() {
+    synchronized(this) {
+      return sdaConnected;
     }
   }
 
+  /**
+   * Checks if a print job is running
+   * @return Returns true if a print job is running
+  */
   public boolean isJobRunning() {
     synchronized(this) {
       return jobRunning;
     }
   }
 
-  //called to start a print job
+  /**
+   * Checks if a pause request has been issued, or the print job is paused
+   * @return Returns true if a print job is paused
+  */
+  public boolean pauseRequested() {
+    synchronized(this) {
+      return pauseRequest;
+    }
+  }
+
+  /**
+   * Checks if a stop request has been issued
+   * @return Returns true if a stop request has been issued
+  */
+  public boolean stopRequested() {
+    synchronized(this) {
+      return stopRequest;
+    }
+  }
+
+  /**
+   * Starts a new print job using the supplied GCode. A new print job will not startTime
+   * if a current job is in progress, or a serial port is not connected
+   * @param GCodeFile An array list containing GCode to be sent to the printer
+   * @return Returns true if a new job was started successfuly
+  */
   public boolean startPrintJob(ArrayList<String> GCodeFile) {
     //Reset stop/pause requests
     synchronized(this) {
@@ -127,37 +210,56 @@ public class DeviceController extends Thread {
       pauseRequest = false;
     }
 
-    if (!isJobRunning() && (sdaConnected || testMode)) {
-      this.GCode = GCodeFile;
-      jobRequest = true;
+    if (!isJobRunning() && (testMode || serialConnected())) {
+      synchronized(this) {
+        this.GCode = GCodeFile;
+        jobRequest = true;
+      }
       return true;
     }
     return false;
   }
 
-  //executed by thread when print job request made
-  private boolean runPrintJob() {
+  /*
+    Private interface
+  */
+
+  /**
+   * Executed by the DeviceController thread. Sends each GCode line to the printer,
+   * and handles failed lines or resends
+  */
+  private void runPrintJob() {
     synchronized(this) {
       if (GCode == null) {
-        return false;
+        //Don't start the job if no GCode has been provided
+        return;
       }
       jobRunning = true;
     }
 
+    //Wait for the printer to send a wait response. This shows the printer is booted
+    // up and ready to accept commands
     String response = "";
     while (!testMode) {
+      //The prusa i3 delimits lines with a carriage return
       response = serialCom.readStringUntil('\r');
       if (response != null) {
+        //Check if the response is whay we want
         if (response.contains("wait")) {
-          System.out.println("Starting...");
+          System.out.println("Starting print job...");
           break;
         }
       }
     }
-    synchronized(serialCom) {
-      serialCom.write("M110 N0\n");
+
+    //Reset the printer's expected next line to line 1
+    if(!testMode) {
+      synchronized(serialCom) {
+        serialCom.write("M110 N0\n");
+      }
     }
 
+    //Wait for a response from the M110 command
     while (!testMode) {
       response = serialCom.readStringUntil('\r');
       if (response != null) {
@@ -168,15 +270,19 @@ public class DeviceController extends Thread {
     }
 
     int lineNumber = 1;
+
+    //Strip any BOMs from unicode GCode files
     GCode.set(0, GCode.get(0).replace("\ufeff", ""));
     GCode.set(0, GCode.get(0).replace("\ufffe", ""));
 
+    //For each line of GCode
     for (int i = 0; i < GCode.size(); i++) {
-
+      //If a pause request has been sent, sleep until a resume is sent
       if (pauseRequested()) {
         System.out.println("Printing paused...");
       }
       while (!stopRequested() && pauseRequested()) {
+        //Thread.sleep requires the try...catch block because it throws an exception
         try {
           sleep(10);
         }
@@ -185,41 +291,69 @@ public class DeviceController extends Thread {
         }
       }
 
+      //If a stopRequest has been sent, stop sending gcode
       if (stopRequested()) {
         System.out.println("Printing stopped");
         stopRequest = false;
         synchronized(this) {
           jobRunning = false;
         }
-        return true;
+        return;
       }
 
+      //Skip comment lines
       if (!GCode.get(i).startsWith(";")) {
+        //Only get code prior to any comments
         String line = GCode.get(i).split(";")[0];
         line = line.trim();
+        //If line numbers have not been provided, add them
         if (!line.startsWith("N")) {
           line = "N" + lineNumber + " " + line;
         }
-        //System.out.println(line);
-        while (!sendGCodeLine(line, lineNumber));
+        //Print the line to the console
+        System.out.println(line);
+        //Send the line to the printer, resending until it has been executed successfuly
+        if(!testMode) {
+          while (!sendGCodeLine(line, lineNumber));
+        }
+        //Wait a little in between lines in test mode
+        else {
+          try {
+            sleep(15);
+          }
+          catch(InterruptedException e) {
+            e.printStackTrace();
+          }
+        }
+        //Increment the line number. This is different from the loop counter, since
+        // comment lines are not counted
         lineNumber++;
       }
     }
-
+    //Print job is done
     synchronized(this) {
       jobRunning = false;
     }
-    return true;
   }
 
-  //send single g code command to printer
+  /**
+   * Sends single GCode command to printer
+   * @param line The GCode line to be sent
+   * @param lineNumber The line number associated with the line. This is used to check
+   *                   if it has been accepted
+   * @return Returns true if the line was sent successfuly. If false, the line should be
+   *         sent again
+  */
   private boolean sendGCodeLine(String line, int lineNumber) {
-
     String response = "";
     long startTime = System.currentTimeMillis();
+
+    //Add missing newlines if necessary
     if (!line.endsWith("\n")) {
       line += "\n";
     }
+
+    //Write the line to the serial port
     try {
       synchronized(serialCom) {
         serialCom.write(line);
@@ -229,9 +363,11 @@ public class DeviceController extends Thread {
       e.printStackTrace();
     }
 
-    while (true) {
+    //Loop until we get a response, time out, or the job is stopped
+    while (!stopRequested()) {
       try {
         synchronized(serialCom) {
+          //Try to get a response
           response = serialCom.readStringUntil('\r');
         }
       }
@@ -240,8 +376,13 @@ public class DeviceController extends Thread {
       }
 
       if (response != null) {
+        //Print the response
         System.out.println(response);
-        if (response.contains("ok " + lineNumber)) {
+        //If the response indicates the line was sent OK (or should not be sent again)
+        // return true
+        //If the response conatins temperature data, continue to wait until heating is finished
+        //Otherwise, the line needs to be resent
+        if (response.contains("ok " + lineNumber) || response.contains("skip " + lineNumber)) {
           return true;
         } else if (response.contains("T:")) {
           startTime = System.currentTimeMillis();
@@ -249,16 +390,21 @@ public class DeviceController extends Thread {
           return false;
         }
       }
+      //If waiting has timed out, resend the line
       if (System.currentTimeMillis() - startTime >= timeout) {
         System.out.println("Timed out...");
         return false;
       }
     }
+    return true;
   }
 
-  //Connects to a printer on the specified serial port Returns true if the connection was successful, or false if the connection failed
+  /**
+   * Connects to a printer on the specified serial port
+   * @return Returns true if the connection was successful, or false if the connection failed
+  */
   private boolean _connectSerial() {
-    if (!sdaConnected) {
+    if (!serialConnected() && !testMode) {
       try {
         System.out.println("Connecting to printer on port " + port);
         serialCom = new Serial(thisApplet, port, baudRate);
@@ -272,26 +418,16 @@ public class DeviceController extends Thread {
         return false;
       }
     }
+    else if(testMode) {
+      sdaConnected = true;
+      return true;
+    }
     System.out.println("Serial port is already connected...");
     return false;
   }
 
-  private boolean pauseRequested() {
-    synchronized(this) {
-      return pauseRequest;
-    }
-  }
-
-  private boolean stopRequested() {
-    synchronized(this) {
-      return stopRequest;
-    }
-  }
-
   private Serial             serialCom;
   private ArrayList<String>  GCode;
-  private ArrayList<String>  startCode;
-  private ArrayList<String>  stopCode;
   private PApplet            thisApplet;
   private String             port;
   private int                baudRate;
