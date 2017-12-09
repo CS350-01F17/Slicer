@@ -12,10 +12,12 @@ Facet.pde
  Slicing Team: Chris Iossa (https://www.github.com/ChrisIossa), Paul Canada
  */
 
-class Facet {
+public class Facet {
 
-  private PVector vertex1, vertex2, vertex3, facetNormal;
-
+  private PVector vertex1;
+  private PVector vertex2;
+  private PVector vertex3;
+  private PVector facetNormal;
   /**
    * Constructor that initializes verticies without a normal.
    *
