@@ -125,30 +125,36 @@ public class DeviceController extends Thread {
 
   /**
    * Requestes that the DeviceController stop a currently running print job
+   * @deprecated The return value will be removed in a future version
   */
-  public void stopJob() {
+  public boolean stopJob() {
     synchronized(this) {
       pauseRequest = false;
       stopRequest = true;
     }
+    return true;
   }
 
   /**
    * Requestes that the DeviceController pause a currently running print job
+   * @deprecated The return value will be removed in a future version
   */
-  public void pauseJob() {
+  public boolean pauseJob() {
     synchronized(this) {
       pauseRequest = true;
     }
+    return true;
   }
 
   /**
    * Requestes that the DeviceController resume a currently paused print job
+   * @deprecated The return value will be removed in a future version
   */
-  public void resumeJob() {
+  public boolean resumeJob() {
     synchronized(this) {
       pauseRequest = false;
     }
+    return true;
   }
 
   /**
